@@ -1,0 +1,91 @@
+/* Ekran po zeskanowaniu kodu QR i okno po wyborze zwierzęcia na komputerze. */
+
+/* Nazwa zwierzęcia to jedno słowo, którego nie da się złamać jak „Leśne puzzle”, więc musi zmieścić się w szerokości. */
+.title__heading--animal {
+  font-size: clamp(40px, min(14vh, 15vw), 150px);
+}
+
+.phone__meta {
+  margin: 0 48px 20px 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.phone__title {
+  margin-right: 48px;
+  margin-bottom: 4px;
+}
+
+.phone__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.phone__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  text-align: center;
+}
+
+.phone__label {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.phone__thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.phone__text {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--ink-soft);
+}
+
+.phone__small {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+
+.phone__option .btn {
+  margin-top: auto;
+}
+
+/* Biały kwadrat z marginesem jest częścią kodu: aparat musi widzieć jasne tło także w ciemnym oknie. */
+.phone__qr {
+  flex: none;
+  max-width: 100%;
+  line-height: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.phone__qr .qr {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+@media (max-width: 620px) {
+  .phone__options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

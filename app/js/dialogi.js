@@ -1,5 +1,6 @@
-// Okna dialogowe: pytanie z dwiema odpowiedziami i okno „O aplikacji” z zakładkami.
+// Okna dialogowe: pytanie z dwiema odpowiedziami, wybór ekranu albo telefonu i okno „O aplikacji” z zakładkami.
 // Natywny <dialog> sam pilnuje fokusu i zamyka się klawiszem Esc.
+import { qrSvg } from "./qr.js";
 
 const $ = (id) => document.getElementById(id);
 let selectAboutTab = null;
@@ -18,11 +19,27 @@ export function confirmDialog({ title, text, confirm, cancel }) {
   });
 }
 
+// Wybór zwierzęcia na komputerze. Zwraca true, gdy gracz wybrał układanie na ekranie.
+export function phoneDialog({ title, meta, thumb, focus, link }) {
+  const dialog = $("phoneDialog");
+  $("phoneTitle").textContent = title;
+  $("phoneMeta").textContent = meta;
+  $("phoneThumb").src = thumb;
+  $("phoneThumb").style.objectPosition = focus;
+  $("phoneQr").innerHTML = qrSvg(link);
+  dialog.returnValue = "";
+  dialog.showModal();
+  return new Promise((resolve) => {
+    dialog.addEventListener("close", () => resolve(dialog.returnValue === "ok"), { once: true });
+  });
+}
+
 export function setupDialogs() {
   for (const dialog of document.querySelectorAll("dialog")) {
-    // Kliknięcie w przyciemnione tło poza oknem zamyka je jak „Anuluj”.
+    // Kliknięcie w przyciemnione tło poza oknem zamyka je jak „Anuluj”. Drugie kliknięcie
+    // z podwójnego kliknięcia karty, które samo otworzyło okno, nie liczy się.
     dialog.addEventListener("click", (event) => {
-      if (event.target === dialog) dialog.close("");
+      if (event.target === dialog && event.detail < 2) dialog.close("");
     });
     for (const button of dialog.querySelectorAll("[data-close]")) {
       button.addEventListener("click", () => dialog.close(""));

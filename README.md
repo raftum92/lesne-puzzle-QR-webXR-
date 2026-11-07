@@ -59,6 +59,7 @@ Potem w Chrome na telefonie: `http://localhost:8000/app/?debug=1`. Parametr `deb
 | `app/js/menu.js`, `app/js/gra.js`, `app/js/puzzle.js` | Menu, ekran gry i plansza |
 | `app/js/ar/` | Tryb „W pokoju”: sesja WebXR, plansza w 3D, obraz w ramie, skok zwierzęcia z ramy |
 | `app/vendor/` | Three.js 0.170.0 i jego licencja; ładuje się tylko na urządzeniach z AR |
+| `app/media/czcionki/` | Czcionki Fraunces i Inter (WOFF2, zmienna grubość, znaki łacińskie i polskie) z licencjami SIL OFL 1.1 |
 | `assets/filmy/` | Filmy 1920×1080 do gry na ekranie |
 | `assets/filmy-720p/` | Lżejsze filmy 1280×720 do trybu „W pokoju” |
 | `assets/filmy-skok/` | Filmy, w których zwierzę wyskakuje z ramy w trybie „W pokoju” |
@@ -69,6 +70,5 @@ Dokumentacja, narzędzia do filmów i materiały źródłowe, na które wskazuj�
 
 ## Przed oficjalną publikacją
 
-- Dołączyć pliki czcionek Fraunces i Inter do aplikacji zamiast ładować je z Google Fonts (RODO).
 - Sprawdzić z prawnikiem zdanie o kamerze w „Informacjach prawnych” oraz to, czy wzmianka o AI spełnia art. 50 AI Act.
 - W „Informacjach prawnych” jako właściciel praw figuruje „Leśne puzzle”. Wpisać tam wydawcę: imię i nazwisko albo nazwę firmy.

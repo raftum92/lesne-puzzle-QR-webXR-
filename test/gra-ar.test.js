@@ -233,6 +233,57 @@ test("błąd po przyznaniu sesji kończy ją i wraca do menu", async () => {
   assert.deepEqual(log, ["exit", "start-error"]);
 });
 
+// Chrome na telefonie bez ARCore zgłasza AR, a odmawia dopiero przy starcie sesji.
+function cameraFallbackGame(error) {
+  xrApi.requestSession = async () => Promise.reject(error);
+  const kinds = [];
+  const changes = [];
+  const camera = {
+    fixedView: true,
+    surface: {},
+    scene: new Group(),
+    start: async () => {},
+    stop() {},
+    placeBoard: () => new Group(),
+    onFrame: () => () => {},
+    onPointer: () => () => {},
+    onEnd: () => () => {},
+    onVisibility: () => () => {},
+  };
+  const renderer = fakeRenderer();
+  const made = makeGame({
+    cameraFallback: true,
+    onKindChange: (kind) => changes.push(kind),
+    sessionFactory: (kind, root) => (kinds.push(kind), kind === "kamera" ? camera : new XrSession(root, renderer)),
+  });
+  return { ...made, kinds, changes };
+}
+
+test("telefon bez ARCore, na którym sesja AR nie ruszyła, gra dalej z kamerą", async () => {
+  const { game, log, kinds, changes } = cameraFallbackGame(Object.assign(new Error("ARCore"), { name: "NotSupportedError" }));
+  const warn = console.warn;
+  console.warn = () => {};
+  await game.start("lis", "latwy");
+  console.warn = warn;
+  assert.deepEqual(kinds, ["xr", "kamera"]);
+  assert.deepEqual(changes, ["kamera"]);
+  assert.deepEqual(log, [], "bez wychodzenia do menu i bez okna z błędem");
+  assert.equal(game.kind, "kamera");
+  assert.equal(game.root.dataset.kind, "kamera");
+  assert.equal(game.phase, "intro");
+  finish(game);
+});
+
+test("po odmowie zgody gra nie próbuje kamery", async () => {
+  const { game, log, kinds } = cameraFallbackGame(Object.assign(new Error("odmowa"), { name: "NotAllowedError" }));
+  const warn = console.warn;
+  console.warn = () => {};
+  await game.start("lis", "latwy");
+  console.warn = warn;
+  assert.deepEqual(kinds, ["xr"]);
+  assert.deepEqual(log, ["exit", "start-error"]);
+});
+
 test("błąd przy tworzeniu sesji wraca do menu", async () => {
   const { game, log } = makeGame({
     sessionFactory: () => {

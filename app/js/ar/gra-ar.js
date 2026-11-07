@@ -40,8 +40,8 @@ const easeInOut = (k) => (k < 0.5 ? 4 * k ** 3 : 1 - (-2 * k + 2) ** 3 / 2);
 const once = (target, type) => new Promise((resolve) => target.addEventListener(type, resolve, { once: true }));
 
 export class ArGame {
-  constructor({ root, sounds, progress, video, kind, onExit, onNavigate, onStartError, sessionFactory = createSession }) {
-    Object.assign(this, { root, sounds, progress, video, kind, onExit, onNavigate, onStartError, sessionFactory });
+  constructor({ root, sounds, progress, video, kind, cameraFallback = false, onKindChange, onExit, onNavigate, onStartError, sessionFactory = createSession }) {
+    Object.assign(this, { root, sounds, progress, video, kind, cameraFallback, onKindChange, onExit, onNavigate, onStartError, sessionFactory });
     const $ = (selector) => root.querySelector(selector);
     this.el = {
       title: $("#arTitle"),
@@ -120,6 +120,12 @@ export class ArGame {
       console.warn("Nie udało się uruchomić AR:", error.code, error.message);
       this.session = null;
       if (error.code === "gesture") return this.askForGesture(animalId, levelId);
+      // Chrome zgłasza AR także na telefonach bez ARCore (np. Moto G13), a odmawia dopiero przy starcie sesji.
+      // Odmowa zgody na kamerę dotyczyłaby też trybu z kamerą, więc wtedy nie ma sensu próbować.
+      if (this.kind === "xr" && error.code === "unavailable" && this.cameraFallback) {
+        this.useKind("kamera");
+        return this.start(animalId, levelId);
+      }
       this.exit();
       this.onStartError?.();
       return;
@@ -134,6 +140,12 @@ export class ArGame {
       session.onVisibility((state) => this.onVisibility(state)),
     ];
     if (session.fixedView) this.place(); // nie ma podłogi do szukania, a plansza ma stałe miejsce
+  }
+
+  useKind(kind) {
+    this.kind = kind;
+    this.root.dataset.kind = kind;
+    this.onKindChange?.(kind);
   }
 
   // Przeglądarka odrzuciła sesję, bo minęło za dużo czasu od dotknięcia: wystarczy jeszcze jedno.

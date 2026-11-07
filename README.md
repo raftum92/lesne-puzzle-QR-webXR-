@@ -13,17 +13,19 @@ Tryb „W pokoju” (WebXR) kładzie układankę na prawdziwej podłodze lub sto
 3. Telefon pokazuje nazwę zwierzęcia i przycisk „Ułóż w pokoju” albo „Ułóż z kamerą”. Przeglądarka pozwala otworzyć sesję AR dopiero po dotknięciu, dlatego ten jeden przycisk musi zostać.
 4. Dalej gra toczy się jak zwykle w wybranym trybie, a przełącznik w menu telefonu zostaje na tym trybie.
 
+Okno z kodem pojawia się tylko na urządzeniach z myszą, bez AR. Komputer i telefon nie łączą się ze sobą: kod to zwykły adres, a postęp zapisuje się osobno na każdym urządzeniu. Kod QR powstaje w przeglądarce, bez wysyłania czegokolwiek do zewnętrznych usług.
+
+Z podglądu bez HTTPS, na przykład z `localhost`, kod prowadzi na opublikowaną grę (`PUBLIC_URL` w `app/js/telefon.js`), bo telefon nie otworzy cudzego `localhost`, a WebXR wymaga HTTPS.
+
 ## Tryb „W pokoju” i tryb „Z kamerą”
 
 Tryb „W pokoju” (WebXR) działa tylko na telefonach z Androidem, Chrome i ARCore. Nie każdy Android ma ARCore: na przykład Moto G13 go nie ma, a pełna lista jest na https://developers.google.com/ar/devices. iPhone'y w ogóle nie obsługują WebXR.
 
 Pozostałe telefony i tablety z kamerą dostają tryb „Z kamerą” (`CameraSession` w `app/js/ar/sesja.js`). Obraz z tylnej kamery leży pod przezroczystą sceną 3D, plansza ma stałe miejsce na ekranie, a elementy leżą pod nią w siatce, gdy ekran jest pionowy. Gdy obraz wstaje, widok sam przechodzi przed ramę, a zwierzę wyskakuje z niej tak samo jak w trybie „W pokoju”. Plansza nie leży na prawdziwej podłodze i nie da się jej obejść, bo bez ARCore przeglądarka nie widzi powierzchni. Kamera gaśnie od razu po wyjściu z gry.
 
+Chrome potrafi zgłosić AR także na telefonie bez ARCore i odmówić dopiero przy starcie sesji. Wtedy gra od razu, bez pytania, przechodzi na tryb „Z kamerą”, a przełącznik w menu zmienia nazwę do końca wizyty na stronie. Przy następnym otwarciu strony gra znów najpierw próbuje trybu „W pokoju”, bo powodem mógł być na przykład brak zainstalowanego ARCore.
+
 Komputer z kamerką nie dostaje tego trybu, tylko okno z kodem QR. Telefon bez kamery, bez zgody na nią albo bez HTTPS gra na ekranie.
-
-Okno z kodem pojawia się tylko na urządzeniach z myszą, bez AR. Komputer i telefon nie łączą się ze sobą: kod to zwykły adres, a postęp zapisuje się osobno na każdym urządzeniu. Kod QR powstaje w przeglądarce, bez wysyłania czegokolwiek do zewnętrznych usług.
-
-Z podglądu bez HTTPS, na przykład z `localhost`, kod prowadzi na opublikowaną grę (`PUBLIC_URL` w `app/js/telefon.js`), bo telefon nie otworzy cudzego `localhost`, a WebXR wymaga HTTPS.
 
 ## Serwer: GitHub Pages
 

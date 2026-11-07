@@ -124,6 +124,11 @@ function loadArGame() {
       progress,
       video,
       kind: arKind,
+      cameraFallback: Boolean(navigator.mediaDevices?.getUserMedia),
+      onKindChange: (kind) => {
+        arKind = kind;
+        menu.nameModes(kind);
+      },
       onExit: backToMenu,
       onNavigate: (id) => history.replaceState({ screen: "game" }, "", `#${id}`),
       onStartError: offerScreenMode,

@@ -22,10 +22,6 @@ export class Menu {
 
   // Przełącznik trybu gry. Pojawia się tylko na urządzeniach z AR albo z kamerą w telefonie.
   enableModes(kind) {
-    const names = kind === "kamera" ? CAMERA_MODE_NAMES : MODE_NAMES;
-    this.modes.innerHTML = MODE_ORDER.map(
-      (id) => `<button class="modes__option" type="button" role="radio" data-mode="${id}">${names[id]}</button>`,
-    ).join("");
     this.modes.addEventListener("click", (event) => {
       const option = event.target.closest("[data-mode]");
       if (option) this.selectMode(option.dataset.mode);
@@ -39,6 +35,15 @@ export class Menu {
       this.modes.querySelector(`[data-mode="${next}"]`).focus();
     });
     this.modes.hidden = false;
+    this.nameModes(kind);
+  }
+
+  // Osobno, bo telefon, na którym sesja AR nie ruszyła, zmienia w trakcie „W pokoju” na „Z kamerą”.
+  nameModes(kind) {
+    const names = kind === "kamera" ? CAMERA_MODE_NAMES : MODE_NAMES;
+    this.modes.innerHTML = MODE_ORDER.map(
+      (id) => `<button class="modes__option" type="button" role="radio" data-mode="${id}">${names[id]}</button>`,
+    ).join("");
     this.selectMode(this.progress.mode, { silent: true });
   }
 

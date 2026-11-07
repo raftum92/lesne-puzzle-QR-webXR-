@@ -113,7 +113,7 @@ export class XrSession extends Session {
       });
     } catch (error) {
       this.finish();
-      throw Object.assign(new Error(error.message), { code: errorCode(error) });
+      throw Object.assign(new Error(error.message), { code: errorCode(error), reason: error.name });
     }
     this.xr = session;
     this.touches = new Map();
@@ -139,7 +139,7 @@ export class XrSession extends Session {
     } catch (error) {
       // Przyznana sesja musi się zakończyć, inaczej zostaje obraz z kamery bez żadnych przycisków.
       await session.end().catch(() => this.finish());
-      throw Object.assign(new Error(error.message), { code: "unavailable" });
+      throw Object.assign(new Error(error.message), { code: "unavailable", reason: error.name });
     }
     renderer.setAnimationLoop((time, frame) => this.frame(time, frame));
   }
@@ -307,7 +307,7 @@ export class CameraSession extends CanvasSession {
       this.finish();
       // Blokada zasad strony to też brak zgody; kolejne dotknięcie niczego by nie zmieniło.
       const code = error.name === "NotAllowedError" || error.name === "SecurityError" ? "denied" : "unavailable";
-      throw Object.assign(new Error(error.message), { code });
+      throw Object.assign(new Error(error.message), { code, reason: error.name });
     }
     this.stream = stream;
     if (this.ended) {
@@ -324,7 +324,7 @@ export class CameraSession extends CanvasSession {
       await this.feed.play();
     } catch (error) {
       this.stop();
-      throw Object.assign(new Error(error.message), { code: "unavailable" });
+      throw Object.assign(new Error(error.message), { code: "unavailable", reason: error.name });
     }
     if (this.ended) throw Object.assign(new Error("Gracz wyszedł w czasie uruchamiania kamery"), { code: "unavailable" });
     this.surface = { position: new THREE.Vector3(0.5, 0, BOARD_H / 2), yaw: 0 }; // początek planszy w środku sceny

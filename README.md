@@ -29,6 +29,8 @@ Gdy nie ruszy też kamera, okno z błędem kończy się kodem, np. „Kod błęd
 
 Komputer z kamerką nie dostaje tego trybu, tylko okno z kodem QR. Telefon bez kamery, bez zgody na nią albo bez HTTPS gra na ekranie.
 
+Sprawdzone na prawdziwych telefonach 7 listopada 2026: telefon z ARCore gra w trybie „W pokoju”, a Moto G13 (bez ARCore) w trybie „Z kamerą”, po zeskanowaniu kodu QR z monitora. Na iPhonie tryb „Z kamerą” nie był jeszcze sprawdzany.
+
 ## Serwer: GitHub Pages
 
 Gra jest hostowana przez GitHub Pages z gałęzi `main`, katalog główny. Każdy commit na `main` publikuje się sam w ciągu około minuty. Pages daje HTTPS z prawdziwym certyfikatem i obsługuje nagłówek Range, czego wymagają WebXR i odtwarzanie filmów. `index.html` w katalogu głównym przekierowuje do `app/`, a `.nojekyll` wyłącza przetwarzanie plików przez Jekyll.

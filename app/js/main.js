@@ -18,7 +18,7 @@ const progress = new Progress();
 const sounds = new Sounds("media/las.wav");
 const backdrop = new Backdrop($("backdrop"));
 let ignorePop = false; // wyjście przyciskiem w aplikacji samo cofa historię przeglądarki
-let arKind = null; // "xr", "symulacja" albo null, gdy urządzenie nie obsługuje AR
+let arKind = null; // "xr", "kamera", "symulacja" albo null, gdy urządzenie gra tylko na ekranie
 let arGame = null; // obietnica gry w trybie „W pokoju”; Three.js ładuje się tylko na urządzeniach z AR
 let arCurrent = null;
 
@@ -78,9 +78,10 @@ function boot() {
 }
 
 async function setupAr() {
-  arKind = await detectAr({ location, navigator });
+  arKind = await detectAr({ location, navigator, touch: matchMedia("(pointer: coarse)").matches });
   if (!arKind) return;
-  menu.enableModes();
+  menu.enableModes(arKind);
+  if (arKind === "kamera") return; // kamera nie wymaga świeżego dotknięcia, więc Three.js załaduje się dopiero do gry
   await loadArGame().catch(() => {}); // błąd ładowania obsłuży dopiero dotknięcie zwierzęcia
 }
 
@@ -98,8 +99,9 @@ async function setupPhoneLanding(link, arReady) {
   $("titleText").textContent = `Poziom ${level.name.toLowerCase()} · ${piecesLabel(pieceCount(level))}`;
   enter.textContent = "Chwileczkę…";
   await arReady;
-  enter.textContent = arKind ? "Ułóż w pokoju" : "Ułóż na ekranie";
+  enter.textContent = !arKind ? "Ułóż na ekranie" : arKind === "kamera" ? "Ułóż z kamerą" : "Ułóż w pokoju";
   if (!arKind) $("titleText").textContent = "To urządzenie nie obsługuje trybu W pokoju, ale obrazek ułożysz na ekranie.";
+  if (arKind === "kamera") $("titleText").textContent = "Ten telefon nie ma pełnego trybu W pokoju, więc obrazek ułożysz na tle obrazu z kamery.";
   enter.addEventListener("click", () => startFromLink(link), { once: true });
   enter.disabled = false;
 }
@@ -136,9 +138,10 @@ function loadArGame() {
 }
 
 async function offerScreenMode() {
+  const camera = arKind === "kamera";
   const toScreen = await confirmDialog({
-    title: "Nie udało się uruchomić trybu W pokoju",
-    text: "Możesz zagrać na ekranie.",
+    title: camera ? "Nie udało się włączyć kamery" : "Nie udało się uruchomić trybu W pokoju",
+    text: camera ? "Zezwól przeglądarce na użycie kamery albo zagraj na ekranie." : "Możesz zagrać na ekranie.",
     confirm: "Zagraj na ekranie",
     cancel: "Zamknij",
   });

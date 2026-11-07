@@ -1,11 +1,13 @@
 // Sesja AR: obraz, szukanie podłogi, plansza trzymana w miejscu i dotyk.
-// XrSession działa na telefonie, a SimulatedSession na komputerze. Reszta kodu nie wie, której używa.
+// XrSession działa na telefonie z ARCore, CameraSession na pozostałych telefonach, a SimulatedSession na komputerze.
+// Reszta kodu nie wie, której używa.
 import * as THREE from "../../vendor/three.module.min.js";
-import { BOARD_H } from "./uklad.js";
+import { BOARD_H, fixedView } from "./uklad.js";
 
 const MAX_TILT_COS = Math.cos((20 * Math.PI) / 180); // bardziej odchylona powierzchnia to już nie podłoga ani stół
 const SIM_SURFACE_MS = 500; // po takim czasie symulator „znajduje” podłogę
 const XR_RESOLUTION = 0.7; // pełna rozdzielczość telefonu daje tylko 20–25 kl./s przy pustej scenie, a ta stałe 30
+const CAMERA_REQUEST = { audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } };
 
 // Jeden renderer na całą stronę: przeglądarki pozwalają tylko na kilka kontekstów WebGL.
 let sharedRenderer = null;
@@ -228,54 +230,37 @@ export class XrSession extends Session {
   }
 }
 
-// Próba bez telefonu: szara podłoga, mysz zamiast palca, strzałki krążą kamerą.
-class SimulatedSession extends Session {
-  // Próba błędów startu: ?ar=symulacja&blad=denied albo unavailable, albo gesture.
-  static nextError = new URLSearchParams(location.search).get("blad");
-
-  async start() {
-    if (SimulatedSession.nextError) {
-      const code = SimulatedSession.nextError;
-      SimulatedSession.nextError = null;
-      throw Object.assign(new Error(`Symulowany błąd: ${code}`), { code });
-    }
-    const renderer = this.renderer;
-    renderer.xr.enabled = false;
-    this.canvas = renderer.domElement;
+// Sesja na zwykłym płótnie, bez WebXR: palec albo mysz jako promień i kamera sceny ustawiana z kodu.
+class CanvasSession extends Session {
+  attachCanvas(extraHandlers = {}) {
+    this.renderer.xr.enabled = false;
+    this.canvas = this.renderer.domElement;
     this.canvas.className = "ar__canvas";
     this.overlayRoot.prepend(this.canvas);
-    this.scene.background = new THREE.Color(0x3c403c);
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x7f837d }));
-    floor.position.y = -0.002;
-    this.scene.add(floor, new THREE.GridHelper(12, 24, 0x565a55, 0x6a6e68));
-    this.orbit = { angle: 0, elevation: 0.6, radius: 2.6 };
-    this.startTime = performance.now();
-    this.touching = false;
+    this.touch = null; // palec, który dotknął pierwszy; kolejne nie mogą zakończyć jego przeciągania
+    const release = (event) => {
+      if (event.pointerId !== this.touch) return;
+      this.touch = null;
+      this.emit("pointer", "up", this.rayAt(event), 0);
+    };
     this.handlers = {
       resize: () => this.resize(),
-      keydown: (event) => this.onKey(event),
-      pointermove: (event) => this.touching && this.emit("pointer", "move", this.rayAt(event), 0),
-      pointerup: (event) => {
-        if (!this.touching) return;
-        this.touching = false;
-        this.emit("pointer", "up", this.rayAt(event), 0);
-      },
+      pointermove: (event) => event.pointerId === this.touch && this.emit("pointer", "move", this.rayAt(event), 0),
+      pointerup: release,
+      pointercancel: release,
+      ...extraHandlers,
     };
     this.onPointerDown = (event) => {
-      this.touching = true;
+      if (this.touch !== null) return;
+      this.touch = event.pointerId;
       this.emit("pointer", "down", this.rayAt(event), 0);
     };
     this.canvas.addEventListener("pointerdown", this.onPointerDown);
     for (const [type, handler] of Object.entries(this.handlers)) addEventListener(type, handler);
     this.resize();
-    this.moveCamera();
-    renderer.setAnimationLoop((time) => this.frame(time));
   }
 
   frame(time) {
-    if (!this.surface && performance.now() - this.startTime >= SIM_SURFACE_MS) {
-      this.surface = { position: new THREE.Vector3(0, 0, 0), yaw: 0 };
-    }
     this.emitFrame(time);
     this.renderer.render(this.scene, this.camera);
   }
@@ -285,26 +270,6 @@ class SimulatedSession extends Session {
     this.renderer.setSize(width, height, false);
     this.camera.aspect = width / Math.max(height, 1);
     this.camera.updateProjectionMatrix();
-  }
-
-  onKey(event) {
-    const step = { ArrowLeft: [-0.1, 0], ArrowRight: [0.1, 0], ArrowUp: [0, 0.06], ArrowDown: [0, -0.06] }[event.key];
-    if (!step) return;
-    event.preventDefault();
-    this.orbit.angle += step[0];
-    this.orbit.elevation = Math.min(1.5, Math.max(0.15, this.orbit.elevation + step[1]));
-    this.moveCamera();
-  }
-
-  moveCamera() {
-    const { angle, elevation, radius } = this.orbit;
-    this.camera.position.set(
-      radius * Math.cos(elevation) * Math.sin(angle),
-      radius * Math.sin(elevation),
-      radius * Math.cos(elevation) * Math.cos(angle),
-    );
-    this.camera.lookAt(0, 0, 0);
-    this.camera.updateMatrixWorld();
   }
 
   rayAt(event) {
@@ -329,6 +294,145 @@ class SimulatedSession extends Session {
   }
 }
 
+// Telefon bez ARCore: obraz z kamery pod przezroczystą sceną. Podłogi nie da się tu znaleźć, więc plansza
+// stoi w stałym miejscu ekranu, a kamera sceny sama przechodzi przed ramę, kiedy obraz wstaje.
+export class CameraSession extends CanvasSession {
+  fixedView = true;
+
+  async start() {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(CAMERA_REQUEST);
+    } catch (error) {
+      this.finish();
+      // Blokada zasad strony to też brak zgody; kolejne dotknięcie niczego by nie zmieniło.
+      const code = error.name === "NotAllowedError" || error.name === "SecurityError" ? "denied" : "unavailable";
+      throw Object.assign(new Error(error.message), { code });
+    }
+    this.stream = stream;
+    if (this.ended) {
+      this.stopCamera();
+      throw Object.assign(new Error("Gracz wyszedł, zanim przeglądarka oddała kamerę"), { code: "unavailable" });
+    }
+    this.feed = document.createElement("video");
+    this.feed.className = "ar__feed";
+    this.feed.muted = true;
+    this.feed.playsInline = true;
+    this.feed.srcObject = stream;
+    this.overlayRoot.prepend(this.feed);
+    try {
+      await this.feed.play();
+    } catch (error) {
+      this.stop();
+      throw Object.assign(new Error(error.message), { code: "unavailable" });
+    }
+    if (this.ended) throw Object.assign(new Error("Gracz wyszedł w czasie uruchamiania kamery"), { code: "unavailable" });
+    this.surface = { position: new THREE.Vector3(0.5, 0, BOARD_H / 2), yaw: 0 }; // początek planszy w środku sceny
+    this.standing = 0;
+    this.frontHomes = this.overlayRoot.clientWidth < this.overlayRoot.clientHeight;
+    this.attachCanvas();
+    this.overlayRoot.prepend(this.feed); // pod płótnem
+    this.onDocumentVisibility = () => {
+      this.visibilityState = document.visibilityState;
+      this.emit("visibility", document.visibilityState);
+      if (document.visibilityState === "visible") this.feed?.play().catch(() => {});
+    };
+    document.addEventListener("visibilitychange", this.onDocumentVisibility);
+    this.renderer.setAnimationLoop((time) => this.frame(time));
+  }
+
+  // Rozmiar planszy nie ma tu znaczenia: układ zawsze mieści się w oknie.
+  placeBoard() {
+    return super.placeBoard(1);
+  }
+
+  resize() {
+    super.resize();
+    this.aim();
+  }
+
+  // Postęp od 0 (plansza leży przed graczem) do 1 (rama stoi naprzeciw).
+  setStanding(k) {
+    this.standing = k;
+    this.aim();
+  }
+
+  aim() {
+    const { fov, lying, standing } = fixedView(this.camera.aspect, this.frontHomes);
+    const mix = (key, axis) => lying[key][axis] + (standing[key][axis] - lying[key][axis]) * this.standing;
+    this.camera.fov = fov;
+    this.camera.updateProjectionMatrix();
+    this.camera.position.set(mix("position", "x"), mix("position", "y"), mix("position", "z"));
+    this.camera.lookAt(mix("target", "x"), mix("target", "y"), mix("target", "z"));
+    this.camera.updateMatrixWorld();
+  }
+
+  // Kamera gaśnie od razu po wyjściu z gry.
+  stopCamera() {
+    for (const track of this.stream?.getTracks() ?? []) track.stop();
+    this.stream = null;
+    this.feed?.remove();
+    this.feed = null;
+  }
+
+  stop() {
+    if (this.ended) return;
+    if (this.onDocumentVisibility) document.removeEventListener("visibilitychange", this.onDocumentVisibility);
+    this.stopCamera();
+    super.stop();
+  }
+}
+
+// Próba bez telefonu: szara podłoga, mysz zamiast palca, strzałki krążą kamerą.
+class SimulatedSession extends CanvasSession {
+  // Próba błędów startu: ?ar=symulacja&blad=denied albo unavailable, albo gesture.
+  static nextError = new URLSearchParams(location.search).get("blad");
+
+  async start() {
+    if (SimulatedSession.nextError) {
+      const code = SimulatedSession.nextError;
+      SimulatedSession.nextError = null;
+      throw Object.assign(new Error(`Symulowany błąd: ${code}`), { code });
+    }
+    this.scene.background = new THREE.Color(0x3c403c);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x7f837d }));
+    floor.position.y = -0.002;
+    this.scene.add(floor, new THREE.GridHelper(12, 24, 0x565a55, 0x6a6e68));
+    this.orbit = { angle: 0, elevation: 0.6, radius: 2.6 };
+    this.startTime = performance.now();
+    this.attachCanvas({ keydown: (event) => this.onKey(event) });
+    this.moveCamera();
+    this.renderer.setAnimationLoop((time) => this.frame(time));
+  }
+
+  frame(time) {
+    if (!this.surface && performance.now() - this.startTime >= SIM_SURFACE_MS) {
+      this.surface = { position: new THREE.Vector3(0, 0, 0), yaw: 0 };
+    }
+    super.frame(time);
+  }
+
+  onKey(event) {
+    const step = { ArrowLeft: [-0.1, 0], ArrowRight: [0.1, 0], ArrowUp: [0, 0.06], ArrowDown: [0, -0.06] }[event.key];
+    if (!step) return;
+    event.preventDefault();
+    this.orbit.angle += step[0];
+    this.orbit.elevation = Math.min(1.5, Math.max(0.15, this.orbit.elevation + step[1]));
+    this.moveCamera();
+  }
+
+  moveCamera() {
+    const { angle, elevation, radius } = this.orbit;
+    this.camera.position.set(
+      radius * Math.cos(elevation) * Math.sin(angle),
+      radius * Math.sin(elevation),
+      radius * Math.cos(elevation) * Math.cos(angle),
+    );
+    this.camera.lookAt(0, 0, 0);
+    this.camera.updateMatrixWorld();
+  }
+}
+
 // Przeglądarka zgłasza brak gestu jako SecurityError, a odmowę zgody jako NotAllowedError.
 function errorCode(error) {
   if (error.name === "SecurityError" || /activation|gesture/i.test(error.message)) return "gesture";
@@ -337,5 +441,7 @@ function errorCode(error) {
 }
 
 export function createSession(kind, overlayRoot) {
-  return kind === "symulacja" ? new SimulatedSession(overlayRoot) : new XrSession(overlayRoot);
+  if (kind === "symulacja") return new SimulatedSession(overlayRoot);
+  if (kind === "kamera") return new CameraSession(overlayRoot);
+  return new XrSession(overlayRoot);
 }

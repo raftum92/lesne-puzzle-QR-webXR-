@@ -67,6 +67,15 @@
   touch-action: none;
 }
 
+/* Obraz z kamery na telefonie bez ARCore, pod przezroczystym płótnem. */
+.ar__feed {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .ar .topbar {
   background: linear-gradient(rgba(6, 10, 7, 0.62), rgba(6, 10, 7, 0));
 }
@@ -161,6 +170,12 @@
 .ar__size[aria-checked="true"] {
   background: var(--amber);
   color: #17120a;
+}
+
+/* Ze stałym widokiem plansza ma jeden rozmiar i jedno miejsce. */
+.ar[data-kind="kamera"] .ar__sizes,
+.ar[data-kind="kamera"] [data-action="move-board"] {
+  display: none;
 }
 
 .ar__start {

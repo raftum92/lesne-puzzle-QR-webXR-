@@ -6,7 +6,7 @@ import { createCuts } from "../ksztalty.js";
 import { renderInfo } from "../info.js";
 import { createSession } from "./sesja.js";
 import { Animator } from "./animacje.js";
-import { BOARD_H, BOARD_METERS, LIFT, planHomes, targetOf } from "./uklad.js";
+import { BOARD_H, BOARD_METERS, LIFT, planFrontHomes, planHomes, targetOf } from "./uklad.js";
 import { Frame } from "./rama.js";
 import { JUMP_FADE_MS, canJump, jumpDue } from "./skok.js";
 import { Dragger } from "./przeciaganie.js";
@@ -27,6 +27,7 @@ const SPACE_HINT_MS = 3000; // tyle widać przypomnienie o wolnym miejscu na poc
 const NO_SURFACE_MS = 15000; // po takim czasie bez podłogi gra podpowiada, co zmienić
 const HINT_SPACE = "Rozejrzyj się, czy masz wolne miejsce, i uważaj na przeszkody";
 const HINT_SEARCH = "Powoli poruszaj telefonem, żeby znaleźć podłogę";
+const HINT_CAMERA = "Zezwól przeglądarce na użycie kamery";
 const HINT_NO_SURFACE = "Skieruj telefon na podłogę z wyraźnym wzorem i dobrym światłem";
 const HINT_TRACKING = "Porusz telefonem, żeby znów zobaczyć podłogę";
 const HINT_IMAGE = "Nie udało się wczytać obrazka. Sprawdź połączenie i spróbuj ponownie.";
@@ -72,6 +73,7 @@ export class ArGame {
     this.stats = { picks: 0 };
     this.size = "podloga";
     this.debug = new URLSearchParams(location.search).get("debug") === "1";
+    this.root.dataset.kind = kind;
     this.el.fps.hidden = !this.debug;
     this.animator = new Animator({ reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches });
     $('[data-action="back"]').addEventListener("click", () => this.requestExit());
@@ -88,7 +90,7 @@ export class ArGame {
     root.addEventListener("beforexrselect", (event) => {
       if (event.target.closest("button, a, .info, .ar__confirm")) event.preventDefault();
     });
-    if (kind === "symulacja") window.__ar = { game: this };
+    if (kind === "symulacja" || this.debug) window.__ar = { game: this };
   }
 
   get phase() {
@@ -105,7 +107,7 @@ export class ArGame {
     this.stats.picks = 0;
     this.phase = "placing";
     this.setAnimal(animalId);
-    this.setHint(HINT_SEARCH);
+    this.setHint(this.kind === "kamera" ? HINT_CAMERA : HINT_SEARCH);
     this.selectSize(this.size);
     this.el.start.hidden = true;
     this.retry = null;
@@ -131,6 +133,7 @@ export class ArGame {
       session.onEnd(() => this.sessionEnded()),
       session.onVisibility((state) => this.onVisibility(state)),
     ];
+    if (session.fixedView) this.place(); // nie ma podłogi do szukania, a plansza ma stałe miejsce
   }
 
   // Przeglądarka odrzuciła sesję, bo minęło za dużo czasu od dotknięcia: wystarczy jeszcze jedno.
@@ -245,7 +248,7 @@ export class ArGame {
     this.pieceTexture.anisotropy = 4; // elementy widać pod ostrym kątem, leżą na podłodze
     this.pieceTexture.needsUpdate = true;
     this.shadowTexture ??= createShadowTexture();
-    const homes = planHomes(level);
+    const homes = this.session.frontHomes ? planFrontHomes(level) : planHomes(level);
     this.stack = 0;
     this.pieces = [];
     for (let r = 0; r < level.rows; r++) {
@@ -417,6 +420,7 @@ export class ArGame {
     this.sounds.whoosh(RISE_MS / 1000);
     this.sounds.stopAmbience(2); // film ma własne tło lasu
     this.frameObject.rise(RISE_MS);
+    this.moveView(RISE_MS, 0, 1);
     await this.wait(FILM_START_MS);
     if (token !== this.token) return;
     const playing = await this.playFilm(token);
@@ -428,6 +432,12 @@ export class ArGame {
       return;
     }
     await this.watchFilm(token);
+  }
+
+  // Tylko sesja ze stałym widokiem: gracz nie obejdzie ramy, więc kamera sceny robi to za niego.
+  moveView(ms, from, to) {
+    if (!this.session?.fixedView) return;
+    this.animator.add(ms, (e) => this.session?.setStanding(from + (to - from) * e), easeInOut);
   }
 
   // Elementy i plansza znikają, kiedy zasłania je już cały obraz.
@@ -647,6 +657,7 @@ export class ArGame {
     this.cancelJump();
     this.sounds.startAmbience(2);
     this.frameObject.lower(LOWER_MS);
+    this.moveView(LOWER_MS, 1, 0);
     await this.wait(LOWER_MS / 2);
     if (token !== this.token) return;
     this.frameObject.showImage(image);

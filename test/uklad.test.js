@@ -15,6 +15,8 @@ import {
   cellSize,
   targetOf,
   planHomes,
+  planFrontHomes,
+  fixedView,
   pickPiece,
   clampToArea,
   shouldSnap,
@@ -66,6 +68,91 @@ for (const level of Object.values(LEVELS)) {
     }
   });
 }
+
+for (const level of Object.values(LEVELS)) {
+  test(`${level.id}: w układzie pod planszą elementy leżą przed nią, w jej szerokości i bez nachodzenia`, () => {
+    const { cw, ch, size } = cellSize(level);
+    const homes = planFrontHomes(level);
+    assert.equal(homes.length, level.cols * level.rows);
+    for (const { x, z, rot } of homes) {
+      assert.ok(z - ch / 2 >= H + HOME_MARGIN - 1e-9, "na planszy");
+      assert.ok(x - cw / 2 >= -0.05 && x + cw / 2 <= 1.05, "poza szerokością planszy");
+      assert.ok(Math.abs(rot) <= TILT);
+    }
+    for (const a of homes) {
+      for (const b of homes) {
+        if (a !== b) assert.ok(Math.hypot(a.x - b.x, a.z - b.z) >= size);
+      }
+    }
+  });
+}
+
+// Rzut punktu planszy na ekran kamery patrzącej z `position` na `target`: wynik w zakresie -1..1 jest widoczny.
+function project(view, aspect, { x, y, z }) {
+  const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+  const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+  const cross = (a, b) => ({ x: a.y * b.z - a.z * b.y, y: a.z * b.x - a.x * b.z, z: a.x * b.y - a.y * b.x });
+  const norm = (a) => {
+    const l = Math.hypot(a.x, a.y, a.z);
+    return { x: a.x / l, y: a.y / l, z: a.z / l };
+  };
+  const forward = norm(sub(view.target, view.position));
+  const right = norm(cross(forward, { x: 0, y: 1, z: 0 }));
+  const up = cross(right, forward);
+  const v = sub({ x, y, z }, view.position);
+  const depth = dot(v, forward);
+  const t = Math.tan((50 * Math.PI) / 360);
+  return { x: dot(v, right) / (depth * t * aspect), y: dot(v, up) / (depth * t) };
+}
+
+const ASPECTS = [9 / 20, 9 / 16, 3 / 4, 4 / 3, 20 / 9];
+
+test("stały widok mieści planszę i wszystkie elementy, z miejscem na pasek u góry", () => {
+  for (const aspect of ASPECTS) {
+    for (const front of [true, false]) {
+      const view = fixedView(aspect, front);
+      for (const level of Object.values(LEVELS)) {
+        const { cw, ch } = cellSize(level);
+        const homes = front ? planFrontHomes(level) : planHomes(level);
+        const points = [{ x: 0, z: 0 }, { x: 1, z: 0 }, { x: 0, z: H }, { x: 1, z: H }];
+        for (const home of homes) {
+          for (const dx of [-0.6, 0.6]) for (const dz of [-0.6, 0.6]) points.push({ x: home.x + dx * cw, z: home.z + dz * ch });
+        }
+        for (const point of points) {
+          const p = project(view.lying, aspect, { ...point, y: 0 });
+          const where = `proporcje ${aspect.toFixed(2)}, ${front ? "pod planszą" : "po bokach"}, ${level.id}`;
+          assert.ok(Math.abs(p.x) <= 1, `${where}: poza ekranem w poziomie (${p.x.toFixed(2)})`);
+          assert.ok(p.y >= -0.95 && p.y <= 0.8, `${where}: pod paskiem albo poza ekranem (${p.y.toFixed(2)})`);
+        }
+      }
+    }
+  }
+});
+
+test("na pionowym ekranie plansza zajmuje większość szerokości", () => {
+  const view = fixedView(9 / 20, true);
+  const left = project(view.lying, 9 / 20, { x: 0, y: 0, z: H });
+  const right = project(view.lying, 9 / 20, { x: 1, y: 0, z: H });
+  assert.ok(right.x - left.x > 2 * 0.65, `plansza zajmuje ${(((right.x - left.x) / 2) * 100).toFixed(0)}% szerokości`);
+});
+
+test("naprzeciw ramy widać całą ramę i film ze skokiem", () => {
+  const frame = { half: (0.5 + 34 / 900) * FRAME_SCALE, top: (2 * 34 / 900 + H) * FRAME_SCALE };
+  const film = { half: 0.6 * FRAME_SCALE, center: 0.319 * FRAME_SCALE, half_h: (1.2 * 8 / 9) * FRAME_SCALE };
+  for (const aspect of ASPECTS) {
+    const view = fixedView(aspect, true).standing;
+    for (const x of [0.5 - frame.half, 0.5 + frame.half]) {
+      for (const y of [0, frame.top]) {
+        const p = project(view, aspect, { x, y, z: 0 });
+        assert.ok(Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1, `rama poza ekranem przy ${aspect.toFixed(2)}`);
+      }
+    }
+    for (const y of [film.center - film.half_h, film.center + film.half_h]) {
+      const p = project(view, aspect, { x: 0.5, y, z: 0 });
+      assert.ok(Math.abs(p.y) <= 1, `film ucięty w pionie przy ${aspect.toFixed(2)} (${p.y.toFixed(2)})`);
+    }
+  }
+});
 
 test("planHomes jest losowe", () => {
   const first = JSON.stringify(planHomes(LEVELS.trudny));

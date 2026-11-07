@@ -10,10 +10,16 @@ Tryb „W pokoju” (WebXR) kładzie układankę na prawdziwej podłodze lub sto
 
 1. Na komputerze gracz wybiera poziom i zwierzę, na przykład lisa. Otwiera się okno z dwiema możliwościami: „Ułóż na ekranie” albo kod QR „Ułóż w telefonie”.
 2. Gracz skanuje kod aparatem telefonu. Kod zawiera adres gry z wybranym zwierzęciem i poziomem, na przykład `app/?zwierze=lis&poziom=latwy`.
-3. Telefon pokazuje nazwę zwierzęcia i przycisk „Ułóż w pokoju”. Przeglądarka pozwala otworzyć sesję AR dopiero po dotknięciu, dlatego ten jeden przycisk musi zostać.
-4. Dalej gra toczy się jak zwykle w trybie „W pokoju”, a przełącznik w menu telefonu zostaje na tym trybie.
+3. Telefon pokazuje nazwę zwierzęcia i przycisk „Ułóż w pokoju” albo „Ułóż z kamerą”. Przeglądarka pozwala otworzyć sesję AR dopiero po dotknięciu, dlatego ten jeden przycisk musi zostać.
+4. Dalej gra toczy się jak zwykle w wybranym trybie, a przełącznik w menu telefonu zostaje na tym trybie.
 
-Tryb „W pokoju” działa na Androidzie z Chrome i ARCore. iPhone'y nie obsługują WebXR, więc po zeskanowaniu kodu widzą informację o tym i przycisk „Ułóż na ekranie”.
+## Tryb „W pokoju” i tryb „Z kamerą”
+
+Tryb „W pokoju” (WebXR) działa tylko na telefonach z Androidem, Chrome i ARCore. Nie każdy Android ma ARCore: na przykład Moto G13 go nie ma, a pełna lista jest na https://developers.google.com/ar/devices. iPhone'y w ogóle nie obsługują WebXR.
+
+Pozostałe telefony i tablety z kamerą dostają tryb „Z kamerą” (`CameraSession` w `app/js/ar/sesja.js`). Obraz z tylnej kamery leży pod przezroczystą sceną 3D, plansza ma stałe miejsce na ekranie, a elementy leżą pod nią w siatce, gdy ekran jest pionowy. Gdy obraz wstaje, widok sam przechodzi przed ramę, a zwierzę wyskakuje z niej tak samo jak w trybie „W pokoju”. Plansza nie leży na prawdziwej podłodze i nie da się jej obejść, bo bez ARCore przeglądarka nie widzi powierzchni. Kamera gaśnie od razu po wyjściu z gry.
+
+Komputer z kamerką nie dostaje tego trybu, tylko okno z kodem QR. Telefon bez kamery, bez zgody na nią albo bez HTTPS gra na ekranie.
 
 Okno z kodem pojawia się tylko na urządzeniach z myszą, bez AR. Komputer i telefon nie łączą się ze sobą: kod to zwykły adres, a postęp zapisuje się osobno na każdym urządzeniu. Kod QR powstaje w przeglądarce, bez wysyłania czegokolwiek do zewnętrznych usług.
 
@@ -37,7 +43,7 @@ Potem w przeglądarce: http://localhost:8000/app/. Testy (Node.js 18 lub nowszy)
 node --test test/
 ```
 
-Ekran po zeskanowaniu kodu sprawdzisz w symulatorze AR, bez telefonu: `http://localhost:8000/app/?ar=symulacja&zwierze=lis&poziom=latwy`. Lewy przycisk myszy działa jak palec, a strzałki krążą kamerą. Adres z `ar=symulacja` działa tylko na `localhost` i `127.0.0.1`.
+Ekran po zeskanowaniu kodu sprawdzisz w symulatorze AR, bez telefonu: `http://localhost:8000/app/?ar=symulacja&zwierze=lis&poziom=latwy`. Lewy przycisk myszy działa jak palec, a strzałki krążą kamerą. Tryb z kamerą wymusza `?ar=kamera` (potrzebna kamerka w komputerze). Oba parametry działają tylko na `localhost` i `127.0.0.1`.
 
 Na telefonie, przez kabel USB z włączonym debugowaniem:
 
@@ -57,8 +63,8 @@ Potem w Chrome na telefonie: `http://localhost:8000/app/?debug=1`. Parametr `deb
 | `app/js/qr.js` | Generator kodów QR, bez bibliotek |
 | `app/js/dialogi.js` | Okna dialogowe, w tym wybór ekranu albo telefonu |
 | `app/js/menu.js`, `app/js/gra.js`, `app/js/puzzle.js` | Menu, ekran gry i plansza |
-| `app/js/ar/` | Tryb „W pokoju”: sesja WebXR, plansza w 3D, obraz w ramie, skok zwierzęcia z ramy |
-| `app/vendor/` | Three.js 0.170.0 i jego licencja; ładuje się tylko na urządzeniach z AR |
+| `app/js/ar/` | Tryby „W pokoju” i „Z kamerą”: sesja WebXR albo obraz z kamery, plansza w 3D, obraz w ramie, skok zwierzęcia z ramy |
+| `app/vendor/` | Three.js 0.170.0 i jego licencja; ładuje się tylko w trybach „W pokoju” i „Z kamerą” |
 | `app/media/czcionki/` | Czcionki Fraunces i Inter (WOFF2, zmienna grubość, znaki łacińskie i polskie) z licencjami SIL OFL 1.1 |
 | `assets/filmy/` | Filmy 1920×1080 do gry na ekranie |
 | `assets/filmy-720p/` | Lżejsze filmy 1280×720 do trybu „W pokoju” |

@@ -5,8 +5,10 @@ import { Progress, resolveMode } from "./postep.js";
 import { Backdrop } from "./tlo.js";
 import { Menu } from "./menu.js";
 import { Game } from "./gra.js";
-import { confirmDialog, openAbout, setupDialogs } from "./dialogi.js";
+import { confirmDialog, openAbout, phoneDialog, setupDialogs } from "./dialogi.js";
 import { LOGO, UI } from "./ikony.js";
+import { LEVELS, pieceCount, piecesLabel } from "./poziomy.js";
+import { phoneLink, readPhoneLink, withoutPhoneLink } from "./telefon.js";
 import { detectAr } from "./ar/wykrywanie.js";
 
 const $ = (id) => document.getElementById(id);
@@ -48,9 +50,6 @@ function boot() {
   video.preload = "none";
   video.src = first.video;
 
-  const enter = $("enterButton");
-  enter.addEventListener("click", start, { once: true });
-  enter.disabled = false;
   for (const button of document.querySelectorAll(".sound-btn")) button.addEventListener("click", toggleSound);
   for (const button of document.querySelectorAll('[data-action="about"]')) {
     button.addEventListener("click", () => {
@@ -67,14 +66,52 @@ function boot() {
     event.preventDefault(); // inaczej to samo naciśnięcie od razu zamknęłoby otwierane pytanie o wyjście
     current.requestExit();
   });
-  setupAr();
+  const arReady = setupAr();
+  const link = readPhoneLink(location.search);
+  if (link) {
+    setupPhoneLanding(link, arReady);
+  } else {
+    const enter = $("enterButton");
+    enter.addEventListener("click", start, { once: true });
+    enter.disabled = false;
+  }
 }
 
 async function setupAr() {
   arKind = await detectAr({ location, navigator });
   if (!arKind) return;
   menu.enableModes();
-  loadArGame().catch(() => {}); // błąd ładowania obsłuży dopiero dotknięcie zwierzęcia
+  await loadArGame().catch(() => {}); // błąd ładowania obsłuży dopiero dotknięcie zwierzęcia
+}
+
+// Telefon po zeskanowaniu kodu QR: od razu to zwierzę i ten poziom. Sesję AR wolno otworzyć dopiero
+// po dotknięciu, więc zostaje jeden przycisk. Włącza się po wczytaniu Three.js, bo przeglądarka
+// odrzuca sesję, gdy od dotknięcia minęło za dużo czasu.
+async function setupPhoneLanding(link, arReady) {
+  const animal = ANIMALS[link.animal];
+  const level = LEVELS[link.level];
+  const enter = $("enterButton");
+  backdrop.set(animal.thumb);
+  document.title = `${animal.name} · Leśne puzzle`;
+  $("titleHeading").textContent = animal.name;
+  $("titleHeading").classList.add("title__heading--animal");
+  $("titleText").textContent = `Poziom ${level.name.toLowerCase()} · ${piecesLabel(pieceCount(level))}`;
+  enter.textContent = "Chwileczkę…";
+  await arReady;
+  enter.textContent = arKind ? "Ułóż w pokoju" : "Ułóż na ekranie";
+  if (!arKind) $("titleText").textContent = "To urządzenie nie obsługuje trybu W pokoju, ale obrazek ułożysz na ekranie.";
+  enter.addEventListener("click", () => startFromLink(link), { once: true });
+  enter.disabled = false;
+}
+
+function startFromLink(link) {
+  sounds.unlock();
+  unlockVideo();
+  sounds.startAmbience(2.5);
+  sounds.tap();
+  if (arKind) menu.selectMode("pokoj", { silent: true });
+  history.replaceState(null, "", withoutPhoneLink(location));
+  launch(link.animal, link.level, null);
 }
 
 function loadArGame() {
@@ -140,10 +177,27 @@ function start() {
   $("menuHeading").focus({ preventScroll: true });
 }
 
-function play(animalId, levelId, from) {
+async function play(animalId, levelId, from) {
   if (app.dataset.screen === "game" || app.dataset.screen === "ar") return; // podwójne kliknięcie karty
   sounds.unlock();
   sounds.tap();
+  // Na komputerze bez AR gracz wybiera: układanie na ekranie albo kod QR, który przenosi grę na telefon.
+  if (!arKind && matchMedia("(hover: hover) and (pointer: fine)").matches) {
+    const animal = ANIMALS[animalId];
+    const level = LEVELS[levelId];
+    const onScreen = await phoneDialog({
+      title: animal.name,
+      meta: `Poziom ${level.name.toLowerCase()} · ${piecesLabel(pieceCount(level))}`,
+      thumb: animal.thumb,
+      focus: animal.focus,
+      link: phoneLink(animalId, levelId, location),
+    });
+    if (!onScreen) return;
+  }
+  launch(animalId, levelId, from);
+}
+
+function launch(animalId, levelId, from) {
   history.pushState({ screen: "game" }, "", `#${animalId}`);
   if (resolveMode(progress.mode, arKind) === "pokoj") {
     showScreen("ar");

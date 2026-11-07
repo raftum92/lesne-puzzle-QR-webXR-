@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="css/gra.css">
     <link rel="stylesheet" href="css/info.css">
     <link rel="stylesheet" href="css/ar.css">
+    <link rel="stylesheet" href="css/telefon.css">
     <script type="module" src="js/main.js"></script>
   </head>
   <body>
@@ -35,7 +36,7 @@
           <span class="title__logo" data-logo></span>
           <p class="overline title__overline">Gra o zwierzętach polskich lasów</p>
           <h1 class="title__heading" id="titleHeading">Leśne puzzle</h1>
-          <p class="title__text">Ułóż obrazek, a zwierzę ożyje.</p>
+          <p class="title__text" id="titleText">Ułóż obrazek, a zwierzę ożyje.</p>
           <button class="btn btn--primary btn--large title__button" id="enterButton" type="button" disabled>Zagraj</button>
           <p class="title__hint"><span data-icon="soundOn"></span>Najlepiej z dźwiękiem</p>
         </div>
@@ -174,6 +175,28 @@
         </form>
       </dialog>
 
+      <dialog class="dialog dialog--wide" id="phoneDialog" aria-labelledby="phoneTitle" aria-describedby="phoneMeta">
+        <form class="dialog__panel" method="dialog">
+          <button class="icon-btn dialog__close" type="button" data-close aria-label="Zamknij"><span data-icon="close"></span></button>
+          <h2 class="dialog__title phone__title" id="phoneTitle"></h2>
+          <p class="phone__meta" id="phoneMeta"></p>
+          <div class="phone__options">
+            <section class="phone__option" aria-labelledby="phoneScreenLabel">
+              <h3 class="phone__label" id="phoneScreenLabel">Na ekranie</h3>
+              <img class="phone__thumb" id="phoneThumb" alt="">
+              <p class="phone__text">Układasz myszką, tu, na tym komputerze.</p>
+              <button class="btn btn--primary" value="ok" autofocus>Ułóż na ekranie</button>
+            </section>
+            <section class="phone__option" aria-labelledby="phoneQrLabel">
+              <h3 class="phone__label" id="phoneQrLabel">Ułóż w telefonie</h3>
+              <div class="phone__qr" id="phoneQr"></div>
+              <p class="phone__text">Zeskanuj kod QR aparatem telefonu, a obrazek ułożysz na podłodze albo stole w swoim pokoju.</p>
+              <p class="phone__small">Tryb W pokoju działa na Androidzie w Chrome. Na iPhonie ułożysz obrazek na ekranie telefonu.</p>
+            </section>
+          </div>
+        </form>
+      </dialog>
+
       <dialog class="dialog dialog--wide" id="aboutDialog" aria-labelledby="aboutTitle">
         <div class="dialog__panel about">
           <button class="icon-btn dialog__close" type="button" data-close aria-label="Zamknij"><span data-icon="close"></span></button>
@@ -211,6 +234,7 @@
               <li>Przycisk z okiem na chwilę pokazuje cały obrazek.</li>
               <li>Na telefonach, które to obsługują, tryb „W pokoju” kładzie układankę na prawdziwej podłodze lub stole, widzianej przez kamerę. Uważaj na przeszkody, gdy chodzisz z telefonem.</li>
               <li>W trybie „W pokoju” zwierzęta na koniec wyskakują z obrazu.</li>
+              <li>Na komputerze po wybraniu zwierzęcia możesz zeskanować kod QR telefonem i ułożyć to samo zwierzę w swoim pokoju. Listki i rekordy z telefonu zapisują się na telefonie.</li>
               <li>Za każde ułożenie na danym poziomie otrzymujesz listek. Do zdobycia jest 27 listków: po jednym za każdy poziom dla każdego gatunku.</li>
             </ul>
             <div class="about__footer">
@@ -236,7 +260,7 @@
             <h3>Kamera</h3>
             <p>Tryb „W pokoju” korzysta z kamery tylko po to, żeby pokazać grę w Twoim otoczeniu. Aplikacja nie zapisuje ani nie wysyła obrazu z kamery.</p>
             <h3>Prywatność</h3>
-            <p>Aplikacja nie wymaga zakładania konta. Postęp gry jest przechowywany wyłącznie lokalnie, w pamięci tej przeglądarki.</p>
+            <p>Aplikacja nie wymaga zakładania konta. Postęp gry jest przechowywany wyłącznie lokalnie, w pamięci tej przeglądarki. Kod QR powstaje na tym urządzeniu i zawiera tylko adres gry z wybranym zwierzęciem i poziomem.</p>
           </section>
         </div>
       </dialog>

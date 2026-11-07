@@ -1,0 +1,389 @@
+/* Menu: wybór poziomu trudności i zwierzęcia. */
+
+.menu {
+  display: flex;
+  flex-direction: column;
+  --card-gap: clamp(12px, 1.5vw, 22px);
+  --intro-h: 118px;
+  /* Trzy rzędy kart mieszczą się na ekranie bez przewijania, chyba że karty byłyby za małe. */
+  --card-w: max(236px, min(calc((100vw - var(--gutter-left) - var(--gutter-right) - var(--card-gap) * 2) / 3), calc((100vh - var(--topbar-h) - var(--intro-h) - 40px - var(--card-gap) * 2) / 3 * 16 / 9)));
+  --grid-w: calc(var(--card-w) * 3 + var(--card-gap) * 2);
+}
+
+@supports (height: 100dvh) {
+  .menu {
+    --card-w: max(236px, min(calc((100vw - var(--gutter-left) - var(--gutter-right) - var(--card-gap) * 2) / 3), calc((100dvh - var(--topbar-h) - var(--intro-h) - 40px - var(--card-gap) * 2) / 3 * 16 / 9)));
+  }
+}
+
+.menu__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: var(--topbar-h);
+  padding: 0 var(--gutter-right) 0 var(--gutter-left);
+}
+
+.menu__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px var(--gutter-right) max(28px, env(safe-area-inset-bottom, 0px)) var(--gutter-left);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(244, 239, 228, 0.2) transparent;
+}
+
+.menu__intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px 32px;
+  width: var(--grid-w);
+  max-width: 100%;
+  margin: 0 0 22px;
+}
+
+.menu__heading {
+  margin: 6px 0 8px;
+  font-family: var(--font-display);
+  font-size: clamp(32px, 5vh, 48px);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.menu__heading:focus {
+  outline: none;
+}
+
+.menu__stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.menu__stats strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Przełącznik poziomu: trzy segmenty i bursztynowy suwak pod wybranym */
+.levels {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 5px;
+  border-radius: 18px;
+  background: rgba(8, 12, 9, 0.55);
+  box-shadow: inset 0 0 0 1px var(--line);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.levels__thumb {
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: 5px;
+  width: calc((100% - 10px) / 3);
+  border-radius: 13px;
+  background: var(--amber);
+  box-shadow: 0 8px 24px rgba(227, 167, 91, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transform: translateX(calc(var(--index, 0) * 100%));
+  transition: transform 0.5s var(--ease-out);
+}
+
+.levels__option {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 9px 20px 9px 12px;
+  border: 0;
+  border-radius: 13px;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--ink-soft);
+  transition: color 0.3s ease;
+}
+
+.levels__option:hover {
+  color: var(--ink);
+}
+
+.levels__option[aria-checked="true"] {
+  color: var(--amber-ink);
+}
+
+.levels__option:focus-visible {
+  outline-offset: -3px;
+}
+
+.grid-icon {
+  grid-row: 1 / span 2;
+  width: 28px;
+  height: auto;
+}
+
+.levels__name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.levels__count {
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+  opacity: 0.78;
+}
+
+/* Karty zwierząt */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, var(--card-w));
+  gap: var(--card-gap);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  isolation: isolate;
+  cursor: pointer;
+  text-align: left;
+  background: var(--bg-raised);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.45s var(--ease-out), box-shadow 0.45s var(--ease-out);
+}
+
+/* Cienka ramka nad zdjęciem; na najechanie zmienia się w bursztynową */
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(244, 239, 228, 0.12);
+  pointer-events: none;
+  transition: box-shadow 0.3s ease;
+}
+
+.card__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.9s var(--ease-out);
+}
+
+.card__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5, 8, 6, 0) 42%, rgba(5, 8, 6, 0.8) 100%);
+}
+
+.card__body {
+  position: absolute;
+  left: 16px;
+  right: 76px;
+  bottom: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card__name {
+  font-family: var(--font-display);
+  font-size: clamp(20px, calc(var(--card-w) * 0.078), 30px);
+  font-weight: 600;
+  line-height: 1.05;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
+}
+
+.card__latin {
+  font-size: 12px;
+  font-style: italic;
+  color: rgba(244, 239, 228, 0.66);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.card__leaves {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 3px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: rgba(8, 12, 9, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(244, 239, 228, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.card__leaves .leaf {
+  width: 15px;
+  height: 15px;
+}
+
+.card__best {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.card__best svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (hover: hover) {
+  .card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 26px 50px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+
+  .card:hover .card__img {
+    transform: scale(1.06);
+  }
+
+  .card:hover::after {
+    box-shadow: inset 0 0 0 1.5px rgba(227, 167, 91, 0.8);
+  }
+}
+
+.card:active {
+  transform: scale(0.985);
+}
+
+.card:focus-visible {
+  outline-offset: 4px;
+}
+
+/* Wejście do menu: nagłówek i karty wsuwają się po kolei */
+.menu.is-entering .menu__intro,
+.menu.is-entering .cards__item {
+  animation: menu-in 0.8s var(--ease-out) both;
+}
+
+.menu.is-entering .cards__item {
+  animation-delay: calc(var(--i) * 45ms + 0.12s);
+}
+
+@keyframes menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+}
+
+/* Tablet trzymany pionowo i wąskie okna: dwie kolumny, przewijanie */
+@media (max-width: 860px), (max-aspect-ratio: 1/1) {
+  .menu {
+    --card-w: calc((100vw - var(--gutter-left) - var(--gutter-right) - var(--card-gap)) / 2);
+    --grid-w: 100%;
+  }
+
+  .cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .menu__intro {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Telefon */
+@media (max-width: 560px) {
+  .brand__name {
+    font-size: 19px;
+  }
+
+  .brand [data-logo] {
+    width: 30px;
+    height: 30px;
+  }
+
+  .menu__intro {
+    margin-bottom: 18px;
+  }
+
+  .card {
+    aspect-ratio: 4 / 3;
+    border-radius: 14px;
+  }
+
+  .card__body {
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
+  }
+
+  .card__name {
+    font-size: 19px;
+  }
+
+  .card__latin,
+  .card__best {
+    display: none;
+  }
+
+  .card__leaves {
+    top: 7px;
+    right: 7px;
+    padding: 4px 6px;
+  }
+
+  .card__leaves .leaf {
+    width: 12px;
+    height: 12px;
+  }
+
+  .levels__option {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 8px 4px;
+    text-align: center;
+  }
+
+  .levels__option .grid-icon {
+    display: none;
+  }
+}

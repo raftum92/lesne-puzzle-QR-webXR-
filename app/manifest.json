@@ -1,0 +1,13 @@
+{
+  "name": "Leśne puzzle",
+  "short_name": "Leśne puzzle",
+  "description": "Gra o zwierzętach polskich lasów: ułóż puzzle, a obrazek ożyje.",
+  "lang": "pl",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0b110d",
+  "theme_color": "#0b110d",
+  "icons": [{ "src": "media/ikona.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

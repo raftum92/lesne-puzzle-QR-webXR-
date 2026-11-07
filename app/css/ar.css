@@ -1,0 +1,213 @@
+/* Tryb „W pokoju”: przełącznik w menu i warstwa przycisków nad obrazem z kamery. */
+
+/* Przełącznik trybu w menu */
+.modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 5px;
+  border-radius: 18px;
+  background: rgba(8, 12, 9, 0.55);
+  box-shadow: inset 0 0 0 1px var(--line);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.modes[hidden] {
+  display: none;
+}
+
+.modes__option {
+  appearance: none;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.modes__option[aria-checked="true"] {
+  background: var(--amber);
+  color: #17120a;
+}
+
+/* Ekran AR */
+.app[data-screen="ar"] .ar {
+  z-index: 3;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.6s ease, visibility 0s;
+}
+
+/* W sesji AR tło strony nie może zasłaniać obrazu z kamery. */
+.ar:xr-overlay {
+  background: transparent;
+}
+
+/* Rozmycie tła nad obrazem z kamery kosztuje na telefonie kilka klatek na sekundę. */
+.ar,
+.ar * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Płótno symulatora. Na telefonie obraz rysuje sesja AR i tego elementu nie ma. */
+.ar__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.ar .topbar {
+  background: linear-gradient(rgba(6, 10, 7, 0.62), rgba(6, 10, 7, 0));
+}
+
+.ar[data-phase="reveal"] .topbar,
+.ar[data-phase="video"] .topbar,
+.ar[data-phase="idle"] .topbar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ar[data-phase="info"] .topbar__titles,
+.ar[data-phase="info"] .meter,
+.ar[data-phase="info"] [data-action="peek"],
+.ar[data-phase="info"] [data-action="move-board"],
+.ar[data-phase="start"] .topbar__titles,
+.ar[data-phase="start"] .meter,
+.ar[data-phase="start"] [data-action="peek"],
+.ar[data-phase="start"] [data-action="move-board"],
+.ar[data-phase="placing"] .meter,
+.ar[data-phase="placing"] [data-action="peek"],
+.ar[data-phase="placing"] [data-action="move-board"],
+.ar[data-phase="intro"] [data-action="peek"],
+.ar[data-phase="intro"] [data-action="move-board"] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Podpowiedź na środku u dołu, czytelna na każdym tle */
+.ar__hint {
+  position: absolute;
+  z-index: 44;
+  left: 50%;
+  bottom: calc(max(22px, env(safe-area-inset-bottom, 0px)) + 64px);
+  width: max-content;
+  max-width: calc(100% - 32px);
+  margin: 0;
+  padding: 9px 16px;
+  border-radius: 999px;
+  background: rgba(10, 16, 12, 0.72);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  transform: translateX(-50%);
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.ar__hint:empty {
+  opacity: 0;
+}
+
+.ar[data-phase="placing"] .ar__hint {
+  bottom: calc(max(22px, env(safe-area-inset-bottom, 0px)) + 126px);
+}
+
+/* Rozmiar planszy. Przez pierwsze 8 s sesji Chrome pokazuje na dole ekranu komunikat o pełnym ekranie,
+   który zasłania to miejsce i przejmuje dotknięcia, więc przyciski leżą nad nim. */
+.ar__sizes {
+  position: absolute;
+  z-index: 44;
+  left: 50%;
+  bottom: calc(max(22px, env(safe-area-inset-bottom, 0px)) + 62px);
+  display: none;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 16px;
+  background: rgba(10, 16, 12, 0.72);
+  transform: translateX(-50%);
+}
+
+.ar[data-phase="placing"] .ar__sizes {
+  display: flex;
+}
+
+.ar__size {
+  appearance: none;
+  min-width: 96px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ar__size[aria-checked="true"] {
+  background: var(--amber);
+  color: #17120a;
+}
+
+.ar__start {
+  position: absolute;
+  z-index: 46;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Pominięcie filmu */
+.ar[data-phase="video"] .skip {
+  opacity: 0.8;
+  visibility: visible;
+  transition: opacity 0.6s ease 1.5s, visibility 0s, background 0.2s ease;
+}
+
+/* Okno potwierdzenia. Zwykły <dialog> leży poza warstwą AR i nie byłby widoczny. */
+.ar__confirm {
+  position: absolute;
+  z-index: 60;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(4, 7, 5, 0.55);
+}
+
+.ar__confirm[hidden] {
+  display: none;
+}
+
+.ar__confirm .dialog__panel {
+  width: min(480px, 100%);
+}
+
+/* Licznik klatek przy ?debug=1 */
+.ar__fps {
+  position: absolute;
+  z-index: 61;
+  left: 8px;
+  bottom: 8px;
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font: 12px/1.5 monospace;
+  pointer-events: none;
+}

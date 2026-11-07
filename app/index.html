@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0b110d">
+    <meta name="description" content="Gra o zwierzętach polskich lasów: ułóż puzzle, a obrazek ożyje.">
+    <title>Leśne puzzle</title>
+    <link rel="icon" href="media/ikona.svg" type="image/svg+xml">
+    <link rel="manifest" href="manifest.json">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500..700&family=Inter:wght@400..600&display=swap">
+    <link rel="stylesheet" href="css/podstawa.css">
+    <link rel="stylesheet" href="css/tytul.css">
+    <link rel="stylesheet" href="css/menu.css">
+    <link rel="stylesheet" href="css/gra.css">
+    <link rel="stylesheet" href="css/info.css">
+    <link rel="stylesheet" href="css/ar.css">
+    <script type="module" src="js/main.js"></script>
+  </head>
+  <body>
+    <div class="app" id="app" data-screen="title">
+      <div class="backdrop" id="backdrop" aria-hidden="true">
+        <div class="backdrop__layer"></div>
+        <div class="backdrop__layer"></div>
+      </div>
+      <div class="grain" aria-hidden="true"></div>
+
+      <!-- Ekran tytułowy -->
+      <section class="screen title" id="titleScreen" data-name="title" aria-labelledby="titleHeading">
+        <div class="title__mosaic" id="mosaic" aria-hidden="true"></div>
+        <div class="title__shade" aria-hidden="true"></div>
+        <div class="title__content">
+          <span class="title__logo" data-logo></span>
+          <p class="overline title__overline">Gra o zwierzętach polskich lasów</p>
+          <h1 class="title__heading" id="titleHeading">Leśne puzzle</h1>
+          <p class="title__text">Ułóż obrazek, a zwierzę ożyje.</p>
+          <button class="btn btn--primary btn--large title__button" id="enterButton" type="button" disabled>Zagraj</button>
+          <p class="title__hint"><span data-icon="soundOn"></span>Najlepiej z dźwiękiem</p>
+        </div>
+        <footer class="title__footer">
+          <button class="link" type="button" data-action="about">O aplikacji</button>
+        </footer>
+      </section>
+
+      <!-- Wybór zwierzęcia i poziomu -->
+      <section class="screen menu" id="menuScreen" data-name="menu" aria-labelledby="menuHeading" inert>
+        <header class="menu__header">
+          <div class="brand"><span data-logo></span><span class="brand__name">Leśne puzzle</span></div>
+          <div class="tools">
+            <button class="icon-btn" type="button" data-action="about" aria-label="O aplikacji"><span data-icon="info"></span></button>
+            <button class="icon-btn sound-btn" type="button" aria-label="Wycisz dźwięk">
+              <span class="sound-btn__on" data-icon="soundOn"></span><span class="sound-btn__off" data-icon="soundOff"></span>
+            </button>
+          </div>
+        </header>
+        <div class="menu__body">
+          <div class="menu__intro">
+            <div class="menu__titles">
+              <p class="overline">Zwierzęta polskich lasów</p>
+              <h2 class="menu__heading" id="menuHeading" tabindex="-1">Wybierz zwierzę</h2>
+              <p class="menu__stats" id="menuStats"></p>
+            </div>
+            <div class="modes" id="modes" role="radiogroup" aria-label="Tryb gry" hidden></div>
+            <div class="levels" id="levels" role="radiogroup" aria-label="Poziom trudności"></div>
+          </div>
+          <ul class="cards" id="cards" aria-label="Zwierzęta"></ul>
+        </div>
+      </section>
+
+      <!-- Gra: plansza, ożywający obraz i informacja o zwierzęciu -->
+      <section class="screen game" id="gameScreen" data-name="game" data-phase="idle" aria-labelledby="gameTitle" inert>
+        <header class="topbar">
+          <button class="icon-btn topbar__back" type="button" data-action="back" aria-label="Wróć do wyboru zwierząt">
+            <span data-icon="back"></span><span class="topbar__back-label">Wszystkie zwierzęta</span>
+          </button>
+          <div class="topbar__titles">
+            <h1 class="topbar__title" id="gameTitle"></h1>
+            <p class="topbar__meta"><span id="gameMeta"></span><span class="topbar__hint" id="gameHint"></span></p>
+          </div>
+          <div class="meter" aria-hidden="true">
+            <div class="meter__track" id="meter"></div>
+            <span class="meter__text" id="meterText"></span>
+          </div>
+          <div class="tools">
+            <button class="icon-btn" type="button" data-action="peek" aria-label="Pokaż na chwilę cały obrazek"><span data-icon="eye"></span></button>
+            <button class="icon-btn sound-btn" type="button" aria-label="Wycisz dźwięk">
+              <span class="sound-btn__on" data-icon="soundOn"></span><span class="sound-btn__off" data-icon="soundOff"></span>
+            </button>
+          </div>
+        </header>
+
+        <main class="table" id="table">
+          <div class="tray" id="tray">
+            <img class="tray__ghost" id="ghost" alt="">
+            <svg class="tray__slots" id="slots" aria-hidden="true"></svg>
+            <img class="tray__peek" id="peek" alt="">
+          </div>
+        </main>
+
+        <div class="stage" id="stage">
+          <div class="stage__media">
+            <img class="stage__photo" id="photo" alt="">
+            <video class="stage__video" id="video" playsinline preload="none"></video>
+          </div>
+          <div class="stage__sweep"></div>
+        </div>
+
+        <button class="btn btn--primary btn--large play-fallback" id="playFallback" type="button" hidden>▶ Zobacz, jak ożywa</button>
+        <button class="btn btn--ghost btn--small skip" id="skipFilm" type="button">Pomiń<span data-icon="skip"></span></button>
+        <section class="info" id="info" aria-label="Informacja o zwierzęciu"></section>
+        <p class="sr-only" id="gameLive" role="status" aria-live="polite"></p>
+      </section>
+
+      <!-- Tryb „W pokoju”: warstwa przycisków nad obrazem z kamery. W sesji AR widać tylko tę sekcję. -->
+      <section class="screen ar" id="arScreen" data-name="ar" data-phase="idle" aria-labelledby="arTitle" inert>
+        <header class="topbar">
+          <button class="icon-btn topbar__back" type="button" data-action="back" aria-label="Wróć do wyboru zwierząt">
+            <span data-icon="back"></span>
+          </button>
+          <div class="topbar__titles">
+            <h1 class="topbar__title" id="arTitle"></h1>
+            <p class="topbar__meta"><span id="arMeta"></span></p>
+          </div>
+          <div class="meter" aria-hidden="true">
+            <div class="meter__track" id="arMeter"></div>
+            <span class="meter__text" id="arMeterText"></span>
+          </div>
+          <div class="tools">
+            <button class="icon-btn" type="button" data-action="move-board" aria-label="Przestaw planszę"><span data-icon="move"></span></button>
+            <button class="icon-btn" type="button" data-action="peek" aria-label="Pokaż na chwilę cały obrazek"><span data-icon="eye"></span></button>
+            <button class="icon-btn sound-btn" type="button" aria-label="Wycisz dźwięk">
+              <span class="sound-btn__on" data-icon="soundOn"></span><span class="sound-btn__off" data-icon="soundOff"></span>
+            </button>
+          </div>
+        </header>
+
+        <p class="ar__hint" id="arHint"></p>
+
+        <div class="ar__sizes" id="arSizes" role="radiogroup" aria-label="Rozmiar planszy">
+          <button class="ar__size" type="button" role="radio" data-size="stol">Stół</button>
+          <button class="ar__size" type="button" role="radio" data-size="podloga">Podłoga</button>
+        </div>
+
+        <button class="btn btn--primary btn--large ar__start" id="arStart" type="button" hidden>Uruchom</button>
+        <button class="btn btn--primary btn--large play-fallback" id="arPlayFallback" type="button" hidden>▶ Zobacz, jak ożywa</button>
+        <button class="btn btn--ghost btn--small skip" id="arSkip" type="button">Pomiń<span data-icon="skip"></span></button>
+        <section class="info" id="arInfo" aria-label="Informacja o zwierzęciu"></section>
+
+        <div class="ar__confirm" id="arConfirm" role="alertdialog" aria-labelledby="arConfirmTitle" aria-describedby="arConfirmText" hidden>
+          <div class="dialog__panel">
+            <h2 class="dialog__title" id="arConfirmTitle"></h2>
+            <p class="dialog__text" id="arConfirmText"></p>
+            <div class="dialog__actions">
+              <button class="btn btn--ghost" id="arConfirmCancel" type="button"></button>
+              <button class="btn btn--primary" id="arConfirmOk" type="button"></button>
+            </div>
+          </div>
+        </div>
+
+        <p class="sr-only" id="arLive" role="status" aria-live="polite"></p>
+        <p class="ar__fps" id="arFps" hidden></p>
+      </section>
+
+      <dialog class="dialog" id="confirmDialog" aria-labelledby="confirmTitle" aria-describedby="confirmText">
+        <form class="dialog__panel" method="dialog">
+          <h2 class="dialog__title" id="confirmTitle"></h2>
+          <p class="dialog__text" id="confirmText"></p>
+          <div class="dialog__actions">
+            <button class="btn btn--ghost" id="confirmCancel" value="cancel" autofocus></button>
+            <button class="btn btn--primary" id="confirmOk" value="ok"></button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog class="dialog dialog--wide" id="aboutDialog" aria-labelledby="aboutTitle">
+        <div class="dialog__panel about">
+          <button class="icon-btn dialog__close" type="button" data-close aria-label="Zamknij"><span data-icon="close"></span></button>
+          <div class="about__head">
+            <span class="about__logo" data-logo></span>
+            <div>
+              <h2 class="dialog__title" id="aboutTitle">Leśne puzzle</h2>
+              <p class="about__tagline">Interaktywna układanka przyrodnicza · wersja 1.0</p>
+            </div>
+          </div>
+
+          <div class="tabs" role="tablist" aria-label="Informacje o aplikacji">
+            <button class="tabs__tab" type="button" role="tab" id="tabAbout" aria-controls="panelAbout" aria-selected="true">O aplikacji</button>
+            <button class="tabs__tab" type="button" role="tab" id="tabHowTo" aria-controls="panelHowTo" aria-selected="false" tabindex="-1">Jak grać</button>
+            <button class="tabs__tab" type="button" role="tab" id="tabLegal" aria-controls="panelLegal" aria-selected="false" tabindex="-1">Informacje prawne</button>
+          </div>
+
+          <section class="tabs__panel" role="tabpanel" id="panelAbout" aria-labelledby="tabAbout" tabindex="0">
+            <p>Leśne puzzle łączą klasyczną układankę z edukacją przyrodniczą. Każda plansza przedstawia jeden z dziewięciu gatunków typowych dla polskich lasów, od lisa i sarny po żubra i zimorodka. Ostatni element uruchamia sekwencję, w której fotografia płynnie przechodzi w ruch, a po niej pojawia się karta gatunku z najważniejszymi faktami i mapą występowania w Polsce.</p>
+            <h3>Technologia</h3>
+            <ul class="about__list">
+              <li>Kształty elementów są wyznaczane proceduralnie z krzywych Béziera, dlatego każda rozgrywka dzieli obraz inaczej.</li>
+              <li>Adaptacyjny silnik układu na bieżąco dobiera wielkość planszy i rozmieszczenie elementów do proporcji ekranu, od smartfona trzymanego pionowo po szeroki monitor.</li>
+              <li>Kadr układanki odpowiada pierwszej klatce sekwencji wideo (1080p, 24&nbsp;kl./s), więc obraz przechodzi w ruch bez cięcia montażowego.</li>
+              <li>Dźwięki interfejsu powstają w czasie rzeczywistym dzięki syntezie Web Audio, bez gotowych plików dźwiękowych.</li>
+            </ul>
+            <h3>Treści</h3>
+            <p>Fakty przyrodnicze opracowano na podstawie publikacji naukowych oraz materiałów Ministerstwa Klimatu i Środowiska, GIOŚ, Lasów Państwowych, parków narodowych i National Geographic Polska. Liczebności gatunków podano według najnowszych dostępnych danych.</p>
+          </section>
+
+          <section class="tabs__panel" role="tabpanel" id="panelHowTo" aria-labelledby="tabHowTo" tabindex="0" hidden>
+            <ul class="about__list">
+              <li>Wybierz poziom trudności: łatwy (6 elementów), średni (12) lub trudny (24). Na wyższych poziomach plansza podpowiada coraz mniej.</li>
+              <li>Przeciągaj elementy na planszę. Element upuszczony w pobliżu właściwego miejsca sam się do niego dopasuje.</li>
+              <li>Przycisk z okiem na chwilę pokazuje cały obrazek.</li>
+              <li>Na telefonach, które to obsługują, tryb „W pokoju” kładzie układankę na prawdziwej podłodze lub stole, widzianej przez kamerę. Uważaj na przeszkody, gdy chodzisz z telefonem.</li>
+              <li>W trybie „W pokoju” zwierzęta na koniec wyskakują z obrazu.</li>
+              <li>Za każde ułożenie na danym poziomie otrzymujesz listek. Do zdobycia jest 27 listków: po jednym za każdy poziom dla każdego gatunku.</li>
+            </ul>
+            <div class="about__footer">
+              <p class="about__small">Postęp i rekordy czasu zapisują się tylko na tym urządzeniu.</p>
+              <button class="btn btn--ghost btn--small" id="resetProgress" type="button">Wyzeruj postęp</button>
+            </div>
+          </section>
+
+          <section class="tabs__panel about__legal" role="tabpanel" id="panelLegal" aria-labelledby="tabLegal" tabindex="0" hidden>
+            <p class="about__copyright">© 2026 Leśne puzzle. Wszelkie prawa zastrzeżone, z wyjątkiem materiałów osób trzecich wykorzystanych na licencjach wymienionych poniżej. Kopiowanie, rozpowszechnianie i modyfikowanie aplikacji lub jej części bez zgody właściciela praw jest zabronione.</p>
+            <h3>Obraz</h3>
+            <p>Fotografie źródłowe pochodzą z serwisu Pexels i są wykorzystane na licencji Pexels. Animacje powstały metodą generatywnej syntezy wideo (AI) na bazie tych autentycznych fotografii przyrodniczych. Ujęcia przeszły selekcję i postprodukcję: korektę kadru, montaż oraz miks dźwięku, dla części gatunków z prawdziwymi nagraniami terenowymi.</p>
+            <h3>Dźwięk</h3>
+            <ul class="about__list">
+              <li>Głos lisa: nagranie l3hrja, parsknięcie jelenia: nagranie DRAGON-STUDIO, oba z serwisu Pixabay, na licencji Pixabay.</li>
+              <li>Głos rysia: <a href="https://freesound.org/people/YleArkisto/sounds/243496/" target="_blank" rel="noopener">„Ilves murisee ja mouruaa / One or two lynxes growling”</a>, YleArkisto, Freesound, licencja <a href="https://creativecommons.org/licenses/by/4.0/deed.pl" target="_blank" rel="noopener">CC BY 4.0</a>; fragment wycięty i zmiksowany z obrazem.</li>
+              <li>Dźwięki interfejsu: synteza własna.</li>
+            </ul>
+            <h3>Kartografia i typografia</h3>
+            <p>Kontur Polski: Natural Earth (domena publiczna). Przebieg rzek i zasięgi gatunków mają charakter poglądowy. Kroje pisma: Fraunces i Inter, SIL Open Font License 1.1.</p>
+            <h3>Oprogramowanie</h3>
+            <p>Tryb „W pokoju” korzysta z biblioteki Three.js, licencja MIT.</p>
+            <h3>Kamera</h3>
+            <p>Tryb „W pokoju” korzysta z kamery tylko po to, żeby pokazać grę w Twoim otoczeniu. Aplikacja nie zapisuje ani nie wysyła obrazu z kamery.</p>
+            <h3>Prywatność</h3>
+            <p>Aplikacja nie wymaga zakładania konta. Postęp gry jest przechowywany wyłącznie lokalnie, w pamięci tej przeglądarki.</p>
+          </section>
+        </div>
+      </dialog>
+    </div>
+  </body>
+</html>

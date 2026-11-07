@@ -1,0 +1,25 @@
+# System i edytory
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Sekrety: klucze Google Cloud i zmienne środowiskowe
+.env
+.env.*
+*-service-account*.json
+credentials*.json
+
+# Zależności i build
+node_modules/
+dist/
+build/
+
+# Logi i pliki tymczasowe
+*.log
+tmp/
+*.tmp.mp4
+
+# Oryginalne filmy z Veo przed kompresją (zostają tylko lokalnie)
+assets/filmy/oryginaly/

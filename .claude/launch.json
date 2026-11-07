@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "lesne-puzzle",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["narzedzia/serwer.py", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}

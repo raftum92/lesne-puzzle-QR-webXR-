@@ -1,0 +1,516 @@
+/* Ekran gry: pasek u góry, plansza z elementami i scena, na której obraz ożywa. */
+
+/* Górny pasek */
+.topbar {
+  position: absolute;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: var(--topbar-h);
+  padding: 0 var(--gutter-right) 0 var(--gutter-left);
+  transition: opacity 0.6s ease;
+}
+
+.game[data-phase="reveal"] .topbar,
+.game[data-phase="video"] .topbar,
+.game[data-phase="idle"] .topbar {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.topbar__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
+  min-width: 44px;
+  padding: 0 11px;
+  transition: opacity 0.4s ease, background 0.2s ease, box-shadow 0.2s ease, padding 0.4s var(--ease-out);
+}
+
+.topbar__back-label {
+  display: none !important;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Na ekranie z informacją powrót do menu jest podpisany */
+.game[data-phase="info"] .topbar__back {
+  padding: 0 18px 0 12px;
+}
+
+.game[data-phase="info"] .topbar__back-label {
+  display: inline !important;
+}
+
+.topbar__titles {
+  display: flex;
+  flex: 1;
+  align-items: baseline;
+  gap: 16px;
+  min-width: 0;
+  transition: opacity 0.4s ease;
+}
+
+.topbar__title {
+  flex: none;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.topbar__meta {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.topbar__hint::before {
+  content: "·";
+  margin: 0 9px;
+}
+
+.topbar__hint.is-hidden {
+  display: none;
+}
+
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: opacity 0.4s ease;
+}
+
+.meter__track {
+  display: flex;
+  gap: 3px;
+  width: clamp(96px, 15vw, 210px);
+}
+
+.meter__track i {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(244, 239, 228, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(244, 239, 228, 0.12);
+  transition: background 0.35s ease, box-shadow 0.35s ease;
+}
+
+.meter__track i.is-on {
+  background: var(--amber);
+  box-shadow: 0 0 10px rgba(227, 167, 91, 0.55);
+}
+
+.meter__text {
+  min-width: 3.4em;
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.game[data-phase="info"] .topbar__titles,
+.game[data-phase="info"] .meter,
+.game[data-phase="info"] [data-action="peek"] {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.game[data-phase="intro"] [data-action="peek"] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Stół z planszą i elementami */
+.table {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  touch-action: none;
+  transition: opacity 0.6s ease;
+}
+
+.table.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tray {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgba(4, 7, 5, 0.55);
+  box-shadow:
+    inset 0 0 0 1px rgba(244, 239, 228, 0.08),
+    inset 0 3px 18px rgba(0, 0, 0, 0.65),
+    0 0 0 10px rgba(244, 239, 228, 0.035),
+    0 24px 70px rgba(0, 0, 0, 0.45);
+}
+
+.tray__ghost,
+.tray__peek {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Podpowiedź na planszy: na łatwym poziomie kolorowa, na średnim i trudnym szara */
+.tray__ghost {
+  filter: grayscale(0.5) brightness(0.9);
+  transition: opacity 1.2s ease;
+}
+
+.tray.is-mono .tray__ghost {
+  filter: grayscale(1) brightness(0.95) contrast(0.9);
+}
+
+.tray.is-ready .tray__ghost {
+  opacity: var(--ghost-opacity, 0.26);
+}
+
+/* „Oko”: przez chwilę cały obrazek, jak zdjęcie na pudełku */
+.tray__peek {
+  transition: opacity 0.35s ease;
+}
+
+.tray.is-peeking .tray__peek {
+  opacity: 1;
+}
+
+.tray__slots {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  opacity: 0;
+  transition: opacity 1.2s ease;
+}
+
+.tray.is-ready .tray__slots {
+  opacity: 1;
+}
+
+.tray__slots path {
+  fill: transparent;
+  stroke: rgba(244, 239, 228, 0.24);
+  stroke-width: 1;
+  transition: stroke 0.2s ease, fill 0.2s ease;
+}
+
+.tray__slots path.is-near {
+  fill: rgba(227, 167, 91, 0.14);
+  stroke: var(--amber);
+  stroke-width: 2;
+}
+
+.tray__slots path.is-filled {
+  stroke: transparent;
+}
+
+/* Elementy puzzli */
+.piece {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.piece__body {
+  position: relative;
+  transform-origin: 50% 50%;
+}
+
+.piece__img {
+  display: block;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5)) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35)) brightness(1);
+  transition: filter 0.25s ease;
+}
+
+.piece.is-lifted .piece__img {
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35)) drop-shadow(0 22px 26px rgba(0, 0, 0, 0.45)) brightness(1.03);
+}
+
+.piece.is-placed .piece__img {
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 0 rgba(0, 0, 0, 0)) brightness(1);
+}
+
+.piece.is-snapped .piece__img {
+  animation: snap-glow 0.8s ease-out;
+}
+
+@keyframes snap-glow {
+  0% {
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 0 rgba(255, 214, 150, 0)) brightness(1.3);
+  }
+  30% {
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 16px rgba(255, 214, 150, 0.9)) brightness(1.18);
+  }
+  100% {
+    filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.45)) drop-shadow(0 0 0 rgba(255, 214, 150, 0)) brightness(1);
+  }
+}
+
+.piece__hit {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+}
+
+.piece.is-lifted .piece__hit {
+  cursor: grabbing;
+}
+
+.piece.is-placed .piece__hit {
+  pointer-events: none;
+}
+
+/* Obrazek, który przylatuje z menu na planszę, zanim powstaną z niego elementy */
+.flyer {
+  position: absolute;
+  z-index: 25;
+  display: block;
+  object-fit: cover;
+  pointer-events: none;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.35s ease;
+}
+
+.flyer.is-gone {
+  opacity: 0;
+}
+
+/* Scena: zdjęcie bez szwów i film, który z niego wyrasta */
+.stage {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform-origin: 0 0;
+}
+
+.stage.is-visible {
+  opacity: 1;
+}
+
+.stage.is-leaving {
+  opacity: 0;
+  transition: opacity 0.6s ease;
+}
+
+.stage__media {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 45%;
+  transition: transform 1.2s cubic-bezier(0.45, 0, 0.55, 1), filter 1.2s cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+.stage__photo,
+.stage__video {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.stage__photo {
+  opacity: 0;
+  transition: opacity 0.75s ease;
+}
+
+.stage.is-merged .stage__photo {
+  opacity: 1;
+}
+
+.stage__video {
+  opacity: 0;
+  transition: opacity 0.3s linear;
+}
+
+.stage.is-alive .stage__video {
+  opacity: 1;
+}
+
+/* Powtórka: zatrzymana ostatnia klatka rozmywa się i znika, odsłaniając film od początku */
+.stage__freeze {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: opacity 1.1s cubic-bezier(0.45, 0, 0.55, 1), filter 1.1s cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+.stage__freeze.is-dissolving {
+  opacity: 0;
+  filter: blur(14px);
+}
+
+/* Po filmie ostatnia klatka powoli się przybliża, odpływa spod tekstu i ciemnieje */
+.stage.is-ended .stage__media {
+  transform: translateX(var(--shift, 0%)) scale(var(--zoom, 1.06));
+  filter: brightness(0.82) saturate(0.95);
+  transition: transform 18s cubic-bezier(0.2, 0.6, 0.3, 1), filter 1.6s ease;
+}
+
+/* Smuga światła przechodząca przez obraz, gdy znikają szwy */
+.stage__sweep {
+  position: absolute;
+  top: -10%;
+  bottom: -10%;
+  left: -60%;
+  width: 60%;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, rgba(255, 248, 230, 0) 0%, rgba(255, 248, 230, 0.55) 50%, rgba(255, 248, 230, 0) 100%);
+  mix-blend-mode: overlay;
+}
+
+.stage.is-merged .stage__sweep {
+  animation: sweep 1.2s cubic-bezier(0.45, 0, 0.25, 1) 0.05s both;
+}
+
+@keyframes sweep {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(267%);
+  }
+}
+
+.play-fallback {
+  position: absolute;
+  z-index: 45;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* „Pomiń” pojawia się w rogu dopiero po chwili filmu */
+.skip {
+  position: absolute;
+  z-index: 45;
+  right: var(--gutter-right);
+  bottom: max(22px, env(safe-area-inset-bottom, 0px));
+  background: rgba(10, 16, 12, 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0s linear 0.4s, background 0.2s ease;
+}
+
+.skip svg {
+  width: 15px;
+  height: 15px;
+}
+
+.game[data-phase="video"] .skip {
+  opacity: 0.8;
+  visibility: visible;
+  transition: opacity 0.6s ease 1.5s, visibility 0s, background 0.2s ease;
+}
+
+.game[data-phase="video"] .skip:hover {
+  opacity: 1;
+}
+
+/* Telefon i wąskie ekrany */
+@media (max-aspect-ratio: 1/1), (max-height: 520px) {
+  .topbar {
+    gap: 10px;
+  }
+
+  .topbar__title {
+    font-size: 23px;
+  }
+
+  .topbar__meta {
+    display: none;
+  }
+
+  .meter {
+    gap: 8px;
+  }
+
+  .meter__track {
+    width: clamp(64px, 22vw, 150px);
+  }
+
+  .meter__text {
+    min-width: 2.8em;
+    font-size: 13px;
+  }
+
+  .tools {
+    gap: 8px;
+  }
+
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+  }
+
+  .topbar__back {
+    width: auto;
+    min-width: 40px;
+    padding: 0 9px;
+  }
+
+  .game[data-phase="info"] .topbar__back {
+    padding: 0 16px 0 10px;
+  }
+
+  /* Przewijany tekst informacji przechodzi pod pasek, więc pasek dostaje ciemne tło */
+  .game[data-phase="info"] .topbar {
+    background: linear-gradient(180deg, rgba(6, 10, 7, 0.94) 0%, rgba(6, 10, 7, 0.82) 70%, rgba(6, 10, 7, 0) 100%);
+  }
+
+  .stage.is-ended .stage__media {
+    transform: scale(1.06);
+  }
+}
+
+@media (max-width: 380px) {
+  .meter__track {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage__sweep {
+    display: none;
+  }
+
+  .stage.is-ended .stage__media {
+    transform: none;
+  }
+}

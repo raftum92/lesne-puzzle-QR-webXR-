@@ -101,7 +101,8 @@ export class ArGame {
     this.root.dataset.phase = phase;
   }
 
-  async start(animalId, levelId) {
+  // `attempt` liczy ponowienia po braku gestu, a `failures` zbiera kody błędów do okna z błędem.
+  async start(animalId, levelId, { attempt = 0, failures = [] } = {}) {
     const token = ++this.token;
     this.level = LEVELS[levelId];
     this.stats.picks = 0;
@@ -117,17 +118,19 @@ export class ArGame {
       await session.start();
     } catch (error) {
       if (token !== this.token) return; // gracz wyszedł, zanim przeglądarka oddała sesję
-      console.warn("Nie udało się uruchomić AR:", error.code, error.message);
+      console.warn("Nie udało się uruchomić AR:", error.code, error.reason, error.message);
       this.session = null;
-      if (error.code === "gesture") return this.askForGesture(animalId, levelId);
-      // Chrome zgłasza AR także na telefonach bez ARCore (np. Moto G13), a odmawia dopiero przy starcie sesji.
-      // Odmowa zgody na kamerę dotyczyłaby też trybu z kamerą, więc wtedy nie ma sensu próbować.
-      if (this.kind === "xr" && error.code === "unavailable" && this.cameraFallback) {
+      failures = [...failures, `${this.kind} ${error.reason || error.code}`];
+      if (error.code === "gesture" && attempt === 0) return this.askForGesture(animalId, levelId, failures);
+      // Chrome zgłasza AR także na telefonach bez ARCore (np. Moto G13) i odmawia dopiero przy starcie sesji, różnymi
+      // błędami, zależnie od tego, co gracz zrobi z prośbą o instalację ARCore. Dlatego każdy błąd trybu W pokoju
+      // kończy się próbą z kamerą. Kto naprawdę nie chce kamery, odmówi jeszcze raz i dostanie grę na ekranie.
+      if (this.kind === "xr" && this.cameraFallback) {
         this.useKind("kamera");
-        return this.start(animalId, levelId);
+        return this.start(animalId, levelId, { failures });
       }
       this.exit();
-      this.onStartError?.();
+      this.onStartError?.(failures);
       return;
     }
     if (token !== this.token) return session.stop();
@@ -149,11 +152,11 @@ export class ArGame {
   }
 
   // Przeglądarka odrzuciła sesję, bo minęło za dużo czasu od dotknięcia: wystarczy jeszcze jedno.
-  askForGesture(animalId, levelId) {
+  askForGesture(animalId, levelId, failures) {
     this.phase = "start";
     this.setHint("");
     this.el.start.hidden = false;
-    this.retry = () => this.start(animalId, levelId);
+    this.retry = () => this.start(animalId, levelId, { attempt: 1, failures });
   }
 
   setAnimal(animalId) {

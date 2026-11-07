@@ -234,15 +234,18 @@ test("błąd po przyznaniu sesji kończy ją i wraca do menu", async () => {
 });
 
 // Chrome na telefonie bez ARCore zgłasza AR, a odmawia dopiero przy starcie sesji.
-function cameraFallbackGame(error) {
+function cameraFallbackGame(error, cameraError = null) {
   xrApi.requestSession = async () => Promise.reject(error);
   const kinds = [];
   const changes = [];
+  const failures = [];
   const camera = {
     fixedView: true,
     surface: {},
     scene: new Group(),
-    start: async () => {},
+    start: async () => {
+      if (cameraError) throw cameraError;
+    },
     stop() {},
     placeBoard: () => new Group(),
     onFrame: () => () => {},
@@ -254,9 +257,20 @@ function cameraFallbackGame(error) {
   const made = makeGame({
     cameraFallback: true,
     onKindChange: (kind) => changes.push(kind),
+    onStartError: (codes) => failures.push(...codes),
     sessionFactory: (kind, root) => (kinds.push(kind), kind === "kamera" ? camera : new XrSession(root, renderer)),
   });
-  return { ...made, kinds, changes };
+  return { ...made, kinds, changes, failures };
+}
+
+async function quietly(action) {
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    await action();
+  } finally {
+    console.warn = warn;
+  }
 }
 
 test("telefon bez ARCore, na którym sesja AR nie ruszyła, gra dalej z kamerą", async () => {
@@ -274,14 +288,35 @@ test("telefon bez ARCore, na którym sesja AR nie ruszyła, gra dalej z kamerą"
   finish(game);
 });
 
-test("po odmowie zgody gra nie próbuje kamery", async () => {
+test("odmowa w trybie W pokoju też kończy się próbą z kamerą", async () => {
+  // Chrome bez ARCore zgłasza tak np. odrzuconą prośbę o instalację ARCore, nie tylko odmowę zgody.
   const { game, log, kinds } = cameraFallbackGame(Object.assign(new Error("odmowa"), { name: "NotAllowedError" }));
-  const warn = console.warn;
-  console.warn = () => {};
-  await game.start("lis", "latwy");
-  console.warn = warn;
-  assert.deepEqual(kinds, ["xr"]);
-  assert.deepEqual(log, ["exit", "start-error"]);
+  await quietly(() => game.start("lis", "latwy"));
+  assert.deepEqual(kinds, ["xr", "kamera"]);
+  assert.deepEqual(log, []);
+  assert.equal(game.phase, "intro");
+  finish(game);
+});
+
+test("po drugim braku gestu gra przechodzi na kamerę zamiast znów prosić o dotknięcie", async () => {
+  const { game, kinds } = cameraFallbackGame(Object.assign(new Error("activation"), { name: "SecurityError" }));
+  await quietly(() => game.start("lis", "latwy"));
+  assert.equal(game.phase, "start", "pierwszy raz: przycisk Uruchom");
+  assert.equal(game.el.start.hidden, false);
+  await quietly(() => game.retry());
+  assert.deepEqual(kinds, ["xr", "xr", "kamera"]);
+  assert.equal(game.phase, "intro");
+  finish(game);
+});
+
+test("gdy nie ruszy też kamera, okno z błędem dostaje kody obu błędów", async () => {
+  const { game, log, failures } = cameraFallbackGame(
+    Object.assign(new Error("ARCore"), { name: "NotSupportedError" }),
+    Object.assign(new Error("zajęta"), { code: "unavailable", reason: "NotReadableError" }),
+  );
+  await quietly(() => game.start("lis", "latwy"));
+  assert.deepEqual(log, ["exit"]);
+  assert.deepEqual(failures, ["xr NotSupportedError", "kamera NotReadableError"]);
 });
 
 test("błąd przy tworzeniu sesji wraca do menu", async () => {

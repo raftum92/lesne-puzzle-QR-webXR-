@@ -23,7 +23,9 @@ Tryb „W pokoju” (WebXR) działa tylko na telefonach z Androidem, Chrome i AR
 
 Pozostałe telefony i tablety z kamerą dostają tryb „Z kamerą” (`CameraSession` w `app/js/ar/sesja.js`). Obraz z tylnej kamery leży pod przezroczystą sceną 3D, plansza ma stałe miejsce na ekranie, a elementy leżą pod nią w siatce, gdy ekran jest pionowy. Gdy obraz wstaje, widok sam przechodzi przed ramę, a zwierzę wyskakuje z niej tak samo jak w trybie „W pokoju”. Plansza nie leży na prawdziwej podłodze i nie da się jej obejść, bo bez ARCore przeglądarka nie widzi powierzchni. Kamera gaśnie od razu po wyjściu z gry.
 
-Chrome potrafi zgłosić AR także na telefonie bez ARCore i odmówić dopiero przy starcie sesji. Wtedy gra od razu, bez pytania, przechodzi na tryb „Z kamerą”, a przełącznik w menu zmienia nazwę do końca wizyty na stronie. Przy następnym otwarciu strony gra znów najpierw próbuje trybu „W pokoju”, bo powodem mógł być na przykład brak zainstalowanego ARCore.
+Chrome potrafi zgłosić AR także na telefonie bez ARCore i odmówić dopiero przy starcie sesji, różnymi błędami, zależnie od tego, co gracz zrobi z prośbą o instalację ARCore. Dlatego po każdym nieudanym starcie trybu „W pokoju” gra od razu, bez pytania, przechodzi na tryb „Z kamerą”, a przełącznik w menu zmienia nazwę do końca wizyty na stronie. Przy następnym otwarciu strony gra znów najpierw próbuje trybu „W pokoju”, bo powodem mógł być na przykład brak zainstalowanego ARCore.
+
+Gdy nie ruszy też kamera, okno z błędem kończy się kodem, np. „Kod błędu: xr NotSupportedError, kamera NotReadableError”. Po nim widać, co poszło nie tak na telefonie, którego nie da się podłączyć do komputera.
 
 Komputer z kamerką nie dostaje tego trybu, tylko okno z kodem QR. Telefon bez kamery, bez zgody na nią albo bez HTTPS gra na ekranie.
 

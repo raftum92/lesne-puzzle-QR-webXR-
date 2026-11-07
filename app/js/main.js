@@ -142,11 +142,13 @@ function loadArGame() {
   return arGame;
 }
 
-async function offerScreenMode() {
+// Kod błędu na końcu tekstu pozwala ustalić, co poszło nie tak na telefonie, którego nie da się podłączyć do komputera.
+async function offerScreenMode(failures = []) {
   const camera = arKind === "kamera";
+  const code = failures.length ? ` Kod błędu: ${failures.join(", ")}.` : "";
   const toScreen = await confirmDialog({
     title: camera ? "Nie udało się włączyć kamery" : "Nie udało się uruchomić trybu W pokoju",
-    text: camera ? "Zezwól przeglądarce na użycie kamery albo zagraj na ekranie." : "Możesz zagrać na ekranie.",
+    text: (camera ? "Zezwól przeglądarce na użycie kamery albo zagraj na ekranie." : "Możesz zagrać na ekranie.") + code,
     confirm: "Zagraj na ekranie",
     cancel: "Zamknij",
   });

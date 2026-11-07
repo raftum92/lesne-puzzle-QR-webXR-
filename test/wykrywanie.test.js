@@ -30,3 +30,24 @@ test("sprawdza dokładnie immersive-ar", async () => {
   await detectAr({ location: { hostname: "localhost", search: "" }, navigator });
   assert.deepEqual(asked, ["immersive-ar"]);
 });
+
+test("telefon bez AR, ale z kamerą, dostaje tryb z kamerą", async () => {
+  const location = { hostname: "example.com", search: "" };
+  const mediaDevices = { getUserMedia: async () => ({}) };
+  assert.equal(await detectAr({ location, navigator: { xr: xr(false), mediaDevices }, touch: true }), "kamera");
+  assert.equal(await detectAr({ location, navigator: { mediaDevices }, touch: true }), "kamera");
+  assert.equal(await detectAr({ location, navigator: { xr: xr(true), mediaDevices }, touch: true }), "xr");
+});
+
+test("komputer z kamerką i telefon bez kamery grają na ekranie", async () => {
+  const location = { hostname: "example.com", search: "" };
+  const mediaDevices = { getUserMedia: async () => ({}) };
+  assert.equal(await detectAr({ location, navigator: { xr: xr(false), mediaDevices }, touch: false }), null);
+  assert.equal(await detectAr({ location, navigator: { xr: xr(false) }, touch: true }), null);
+});
+
+test("tryb z kamerą da się wymusić tylko lokalnie", async () => {
+  const search = "?ar=kamera";
+  assert.equal(await detectAr({ location: { hostname: "localhost", search }, navigator: {} }), "kamera");
+  assert.equal(await detectAr({ location: { hostname: "example.com", search }, navigator: {} }), null);
+});

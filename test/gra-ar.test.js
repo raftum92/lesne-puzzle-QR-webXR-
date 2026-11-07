@@ -489,6 +489,45 @@ test("pominięcie tuż przed końcem filmu zatrzymuje rozpoczęty skok", async (
   finish(game);
 });
 
+test("w trybie z kamerą plansza staje od razu, bez szukania podłogi", async () => {
+  const placed = [];
+  const session = {
+    fixedView: true,
+    surface: {},
+    scene: new Group(),
+    start: async () => {},
+    stop() {},
+    placeBoard: (meters) => (placed.push(meters), new Group()),
+    onFrame: () => () => {},
+    onPointer: () => () => {},
+    onEnd: () => () => {},
+    onVisibility: () => () => {},
+  };
+  const { game } = makeGame({ kind: "kamera", sessionFactory: () => session });
+  await game.start("lis", "latwy");
+  assert.equal(placed.length, 1);
+  assert.equal(game.phase, "intro");
+  assert.equal(game.root.dataset.kind, "kamera");
+  finish(game);
+});
+
+test("w trybie z kamerą widok idzie za wstającą i kładącą się ramą", () => {
+  const { game } = gameInProgress();
+  const steps = [];
+  game.session.fixedView = true;
+  game.session.setStanding = (k) => steps.push(k);
+  game.moveView(100, 0, 1);
+  game.animator.update(0);
+  game.animator.update(200);
+  game.moveView(100, 1, 0);
+  game.animator.update(250);
+  game.animator.update(400);
+  assert.equal(steps.at(0), 0);
+  assert.ok(steps.includes(1));
+  assert.equal(steps.at(-1), 0);
+  finish(game);
+});
+
 test("powtórka filmu pokazuje skok jeszcze raz", async () => {
   const { game, watching } = await afterFilm();
   await until(() => game.frameObject.jumpVisible);

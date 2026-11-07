@@ -6,6 +6,7 @@ import { formatTime } from "./postep.js";
 
 const MODE_ORDER = ["ekran", "pokoj"];
 const MODE_NAMES = { ekran: "Na ekranie", pokoj: "W pokoju" };
+const CAMERA_MODE_NAMES = { ekran: "Na ekranie", pokoj: "Z kamerą" };
 
 export class Menu {
   constructor({ root, progress, sounds, backdrop, onPlay }) {
@@ -19,10 +20,11 @@ export class Menu {
     this.select(LEVELS[progress.level] ? progress.level : "latwy", { silent: true });
   }
 
-  // Przełącznik trybu gry. Pojawia się tylko na urządzeniach, które obsługują AR.
-  enableModes() {
+  // Przełącznik trybu gry. Pojawia się tylko na urządzeniach z AR albo z kamerą w telefonie.
+  enableModes(kind) {
+    const names = kind === "kamera" ? CAMERA_MODE_NAMES : MODE_NAMES;
     this.modes.innerHTML = MODE_ORDER.map(
-      (id) => `<button class="modes__option" type="button" role="radio" data-mode="${id}">${MODE_NAMES[id]}</button>`,
+      (id) => `<button class="modes__option" type="button" role="radio" data-mode="${id}">${names[id]}</button>`,
     ).join("");
     this.modes.addEventListener("click", (event) => {
       const option = event.target.closest("[data-mode]");

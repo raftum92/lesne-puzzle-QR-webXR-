@@ -12,8 +12,8 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, reducedMotion 
 const once = (target, type) => new Promise((resolve) => target.addEventListener(type, resolve, { once: true }));
 
 export class Game {
-  constructor({ root, sounds, progress, backdrop, confirm, onExit, onNavigate }) {
-    Object.assign(this, { root, sounds, progress, backdrop, confirm, onExit, onNavigate });
+  constructor({ root, sounds, progress, backdrop, confirm, oneAnimal = false, onExit, onNavigate }) {
+    Object.assign(this, { root, sounds, progress, backdrop, confirm, oneAnimal, onExit, onNavigate });
     const $ = (selector) => root.querySelector(selector);
     this.el = {
       topbar: $(".topbar"),
@@ -187,7 +187,7 @@ export class Game {
     this.el.live.textContent = `Obrazek ułożony! ${animal.name} ożywa.`;
     renderInfo(this.el.info, animal, {
       result: { seconds, level, ...saved },
-      next: ANIMALS[nextAnimal(animal.id)],
+      next: this.oneAnimal ? null : ANIMALS[nextAnimal(animal.id)],
       onNext: () => this.next(),
       onReplay: () => this.replay(),
       onAgain: () => this.again(),
@@ -390,7 +390,7 @@ export class Game {
       this.puzzle = null;
       this.resetStage();
       for (const flyer of this.root.querySelectorAll(".flyer")) flyer.remove();
-      // Element wideo jest wspólny z trybem „W pokoju”, który mógł już załadować swój film.
+      // Element wideo jest wspólny z trybem „W przestrzeni”, który mógł już załadować swój film.
       if (video.getAttribute("src") === this.animal.video) {
         video.removeAttribute("src");
         video.load();

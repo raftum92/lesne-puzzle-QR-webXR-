@@ -84,7 +84,7 @@ export class Progress {
   }
 }
 
-// Zapisany tryb „W pokoju” działa tylko tam, gdzie jest AR.
+// Zapisany tryb „W przestrzeni” działa tylko tam, gdzie jest AR.
 export function resolveMode(saved, arSupport) {
   return saved === "pokoj" && arSupport ? "pokoj" : "ekran";
 }

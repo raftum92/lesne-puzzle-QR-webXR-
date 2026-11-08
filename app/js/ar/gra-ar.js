@@ -1,4 +1,4 @@
-// Gra w trybie „W pokoju”: od szukania podłogi po informację o zwierzęciu.
+// Gra w trybie „W przestrzeni”: od szukania podłogi po informację o zwierzęciu.
 import * as THREE from "../../vendor/three.module.min.js";
 import { ANIMALS, nextAnimal } from "../zwierzeta.js";
 import { LEVELS, pieceCount, piecesLabel } from "../poziomy.js";
@@ -40,8 +40,8 @@ const easeInOut = (k) => (k < 0.5 ? 4 * k ** 3 : 1 - (-2 * k + 2) ** 3 / 2);
 const once = (target, type) => new Promise((resolve) => target.addEventListener(type, resolve, { once: true }));
 
 export class ArGame {
-  constructor({ root, sounds, progress, video, kind, cameraFallback = false, onKindChange, onExit, onNavigate, onStartError, sessionFactory = createSession }) {
-    Object.assign(this, { root, sounds, progress, video, kind, cameraFallback, onKindChange, onExit, onNavigate, onStartError, sessionFactory });
+  constructor({ root, sounds, progress, video, kind, cameraFallback = false, oneAnimal = false, onKindChange, onExit, onNavigate, onStartError, sessionFactory = createSession }) {
+    Object.assign(this, { root, sounds, progress, video, kind, cameraFallback, oneAnimal, onKindChange, onExit, onNavigate, onStartError, sessionFactory });
     const $ = (selector) => root.querySelector(selector);
     this.el = {
       title: $("#arTitle"),
@@ -123,7 +123,7 @@ export class ArGame {
       failures = [...failures, `${this.kind} ${error.reason || error.code}`];
       if (error.code === "gesture" && attempt === 0) return this.askForGesture(animalId, levelId, failures);
       // Chrome zgłasza AR także na telefonach bez ARCore (np. Moto G13) i odmawia dopiero przy starcie sesji, różnymi
-      // błędami, zależnie od tego, co gracz zrobi z prośbą o instalację ARCore. Dlatego każdy błąd trybu W pokoju
+      // błędami, zależnie od tego, co gracz zrobi z prośbą o instalację ARCore. Dlatego każdy błąd trybu W przestrzeni
       // kończy się próbą z kamerą. Kto naprawdę nie chce kamery, odmówi jeszcze raz i dostanie grę na ekranie.
       if (this.kind === "xr" && this.cameraFallback) {
         this.useKind("kamera");
@@ -416,7 +416,7 @@ export class ArGame {
   renderInfoPanel(result) {
     renderInfo(this.el.info, this.animal, {
       result,
-      next: ANIMALS[nextAnimal(this.animal.id)],
+      next: this.oneAnimal ? null : ANIMALS[nextAnimal(this.animal.id)],
       onNext: () => this.next(),
       onReplay: () => this.replay(),
       onAgain: () => this.again(),

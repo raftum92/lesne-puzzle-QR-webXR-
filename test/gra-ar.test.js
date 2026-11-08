@@ -288,7 +288,7 @@ test("telefon bez ARCore, na którym sesja AR nie ruszyła, gra dalej z kamerą"
   finish(game);
 });
 
-test("odmowa w trybie W pokoju też kończy się próbą z kamerą", async () => {
+test("odmowa w trybie W przestrzeni też kończy się próbą z kamerą", async () => {
   // Chrome bez ARCore zgłasza tak np. odrzuconą prośbę o instalację ARCore, nie tylko odmowę zgody.
   const { game, log, kinds } = cameraFallbackGame(Object.assign(new Error("odmowa"), { name: "NotAllowedError" }));
   await quietly(() => game.start("lis", "latwy"));
@@ -573,6 +573,19 @@ test("pominięcie tuż przed końcem filmu zatrzymuje rozpoczęty skok", async (
   assert.equal(game.jumpVideo.paused, true);
   assert.equal(game.frameObject.jumpVisible, false, "skok nie może pojawić się po pominięciu");
   finish(game);
+});
+
+test("telefon z kodu QR nie proponuje następnego zwierzęcia", () => {
+  const result = { seconds: 30, level: LEVELS.latwy, first: true, record: false, best: 30 };
+  const one = gameInProgress({ oneAnimal: true }).game;
+  one.renderInfoPanel(result);
+  assert.doesNotMatch(one.el.info.innerHTML, /Następne zwierzę/);
+  assert.match(one.el.info.innerHTML, /Ułóż jeszcze raz/);
+  const all = gameInProgress().game;
+  all.renderInfoPanel(result);
+  assert.match(all.el.info.innerHTML, /Następne zwierzę/);
+  finish(one);
+  finish(all);
 });
 
 test("w trybie z kamerą plansza staje od razu, bez szukania podłogi", async () => {

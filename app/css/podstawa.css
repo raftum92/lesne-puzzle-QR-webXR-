@@ -405,6 +405,10 @@ a:hover {
   width: min(620px, calc(100vw - 32px));
 }
 
+.dialog--choice {
+  width: min(760px, calc(100vw - 32px));
+}
+
 /* Fokus trafia od razu do środka okna, samo okno nie potrzebuje obwódki */
 .dialog:focus-visible {
   outline: none;

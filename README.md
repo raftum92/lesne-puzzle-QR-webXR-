@@ -6,30 +6,30 @@ Gra działa pod adresem: https://raftum92.github.io/lesne-puzzle-QR-webXR-/app/
 
 ## Kody QR: z monitora na telefon
 
-Tryb „W pokoju” (WebXR) kładzie układankę na prawdziwej podłodze lub stole, widzianej przez kamerę telefonu. Komputer tego nie pokaże, więc kod QR przenosi grę na telefon:
+Gra jest pomyślana jako stanowisko w Centrum Nauki Experyment: zwiedzający układają obrazki głównie na monitorze, a telefon jest dodatkiem. Tryb „W przestrzeni” (WebXR) kładzie układankę na prawdziwej podłodze, widzianej przez kamerę telefonu. Monitor tego nie pokaże, więc kod QR przenosi jedno zwierzę na telefon:
 
-1. Na komputerze gracz wybiera poziom i zwierzę, na przykład lisa. Otwiera się okno z dwiema możliwościami: „Ułóż na ekranie” albo kod QR „Ułóż w telefonie”.
-2. Gracz skanuje kod aparatem telefonu. Kod zawiera adres gry z wybranym zwierzęciem i poziomem, na przykład `app/?zwierze=lis&poziom=latwy`.
-3. Telefon pokazuje nazwę zwierzęcia i przycisk „Ułóż w pokoju” albo „Ułóż z kamerą”. Przeglądarka pozwala otworzyć sesję AR dopiero po dotknięciu, dlatego ten jeden przycisk musi zostać.
-4. Dalej gra toczy się jak zwykle w wybranym trybie, a przełącznik w menu telefonu zostaje na tym trybie.
+1. Na monitorze zwiedzający wybiera poziom i zwierzę, na przykład lisa. Otwiera się okno z dużym obrazkiem i przyciskiem „Ułóż na ekranie” (domyślny, działa też Enter). Obok jest mniejszy kod QR „Dodatkowo: ułóż w telefonie”.
+2. Zwiedzający skanuje kod aparatem telefonu. Kod zawiera adres gry z wybranym zwierzęciem i poziomem, na przykład `app/?zwierze=lis&poziom=latwy`.
+3. Telefon pokazuje nazwę zwierzęcia i przycisk „Ułóż w przestrzeni” albo „Ułóż z kamerą”. Przeglądarka pozwala otworzyć sesję AR dopiero po dotknięciu, dlatego ten jeden przycisk musi zostać.
+4. Telefon ma tylko to jedno zwierzę: nie ma menu ani przycisku „Następne zwierzę”, a wyjście z gry wraca do ekranu tego zwierzęcia, także po odświeżeniu strony. Kolejne zwierzę wybiera się przy monitorze.
 
-Okno z kodem pojawia się tylko na urządzeniach z myszą, bez AR. Komputer i telefon nie łączą się ze sobą: kod to zwykły adres, a postęp zapisuje się osobno na każdym urządzeniu. Kod QR powstaje w przeglądarce, bez wysyłania czegokolwiek do zewnętrznych usług.
+Okno z kodem pojawia się na monitorze, także dotykowym, a nie na telefonie ani tablecie (`isHandheld` w `app/js/telefon.js` rozpoznaje je po przeglądarce, nie po ekranie dotykowym). Monitor i telefon nie łączą się ze sobą: kod to zwykły adres, a postęp zapisuje się osobno na każdym urządzeniu. Kod QR powstaje w przeglądarce, bez wysyłania czegokolwiek do zewnętrznych usług.
 
 Z podglądu bez HTTPS, na przykład z `localhost`, kod prowadzi na opublikowaną grę (`PUBLIC_URL` w `app/js/telefon.js`), bo telefon nie otworzy cudzego `localhost`, a WebXR wymaga HTTPS.
 
-## Tryb „W pokoju” i tryb „Z kamerą”
+## Tryb „W przestrzeni” i tryb „Z kamerą”
 
-Tryb „W pokoju” (WebXR) działa tylko na telefonach z Androidem, Chrome i ARCore. Nie każdy Android ma ARCore: na przykład Moto G13 go nie ma, a pełna lista jest na https://developers.google.com/ar/devices. iPhone'y w ogóle nie obsługują WebXR.
+Tryb „W przestrzeni” (WebXR) działa tylko na telefonach z Androidem, Chrome i ARCore. Nie każdy Android ma ARCore: na przykład Moto G13 go nie ma, a pełna lista jest na https://developers.google.com/ar/devices. iPhone'y w ogóle nie obsługują WebXR.
 
-Pozostałe telefony i tablety z kamerą dostają tryb „Z kamerą” (`CameraSession` w `app/js/ar/sesja.js`). Obraz z tylnej kamery leży pod przezroczystą sceną 3D, plansza ma stałe miejsce na ekranie, a elementy leżą pod nią w siatce, gdy ekran jest pionowy. Gdy obraz wstaje, widok sam przechodzi przed ramę, a zwierzę wyskakuje z niej tak samo jak w trybie „W pokoju”. Plansza nie leży na prawdziwej podłodze i nie da się jej obejść, bo bez ARCore przeglądarka nie widzi powierzchni. Kamera gaśnie od razu po wyjściu z gry.
+Pozostałe telefony i tablety z kamerą dostają tryb „Z kamerą” (`CameraSession` w `app/js/ar/sesja.js`). Obraz z tylnej kamery leży pod przezroczystą sceną 3D, plansza ma stałe miejsce na ekranie, a elementy leżą pod nią w siatce, gdy ekran jest pionowy. Gdy obraz wstaje, widok sam przechodzi przed ramę, a zwierzę wyskakuje z niej tak samo jak w trybie „W przestrzeni”. Plansza nie leży na prawdziwej podłodze i nie da się jej obejść, bo bez ARCore przeglądarka nie widzi powierzchni. Kamera gaśnie od razu po wyjściu z gry.
 
-Chrome potrafi zgłosić AR także na telefonie bez ARCore i odmówić dopiero przy starcie sesji, różnymi błędami, zależnie od tego, co gracz zrobi z prośbą o instalację ARCore. Dlatego po każdym nieudanym starcie trybu „W pokoju” gra od razu, bez pytania, przechodzi na tryb „Z kamerą”, a przełącznik w menu zmienia nazwę do końca wizyty na stronie. Przy następnym otwarciu strony gra znów najpierw próbuje trybu „W pokoju”, bo powodem mógł być na przykład brak zainstalowanego ARCore.
+Chrome potrafi zgłosić AR także na telefonie bez ARCore i odmówić dopiero przy starcie sesji, różnymi błędami, zależnie od tego, co gracz zrobi z prośbą o instalację ARCore. Dlatego po każdym nieudanym starcie trybu „W przestrzeni” gra od razu, bez pytania, przechodzi na tryb „Z kamerą”, a przełącznik w menu zmienia nazwę do końca wizyty na stronie. Przy następnym otwarciu strony gra znów najpierw próbuje trybu „W przestrzeni”, bo powodem mógł być na przykład brak zainstalowanego ARCore.
 
 Gdy nie ruszy też kamera, okno z błędem kończy się kodem, np. „Kod błędu: xr NotSupportedError, kamera NotReadableError”. Po nim widać, co poszło nie tak na telefonie, którego nie da się podłączyć do komputera.
 
-Komputer z kamerką nie dostaje tego trybu, tylko okno z kodem QR. Telefon bez kamery, bez zgody na nią albo bez HTTPS gra na ekranie.
+Monitor z kamerką, także dotykowy, nie dostaje tego trybu, tylko okno z kodem QR. Telefon bez kamery, bez zgody na nią albo bez HTTPS gra na ekranie.
 
-Sprawdzone na prawdziwych telefonach 7 listopada 2026: telefon z ARCore gra w trybie „W pokoju”, a Moto G13 (bez ARCore) w trybie „Z kamerą”, po zeskanowaniu kodu QR z monitora. Na iPhonie tryb „Z kamerą” nie był jeszcze sprawdzany.
+Sprawdzone na prawdziwych telefonach 7 listopada 2026: telefon z ARCore gra w trybie „W przestrzeni”, a Moto G13 (bez ARCore) w trybie „Z kamerą”, po zeskanowaniu kodu QR z monitora. Na iPhonie tryb „Z kamerą” nie był jeszcze sprawdzany.
 
 ## Serwer: GitHub Pages
 
@@ -69,14 +69,14 @@ Potem w Chrome na telefonie: `http://localhost:8000/app/?debug=1`. Parametr `deb
 | `app/js/qr.js` | Generator kodów QR, bez bibliotek |
 | `app/js/dialogi.js` | Okna dialogowe, w tym wybór ekranu albo telefonu |
 | `app/js/menu.js`, `app/js/gra.js`, `app/js/puzzle.js` | Menu, ekran gry i plansza |
-| `app/js/ar/` | Tryby „W pokoju” i „Z kamerą”: sesja WebXR albo obraz z kamery, plansza w 3D, obraz w ramie, skok zwierzęcia z ramy |
-| `app/vendor/` | Three.js 0.170.0 i jego licencja; ładuje się tylko w trybach „W pokoju” i „Z kamerą” |
+| `app/js/ar/` | Tryby „W przestrzeni” i „Z kamerą”: sesja WebXR albo obraz z kamery, plansza w 3D, obraz w ramie, skok zwierzęcia z ramy |
+| `app/vendor/` | Three.js 0.170.0 i jego licencja; ładuje się tylko w trybach „W przestrzeni” i „Z kamerą” |
 | `app/media/czcionki/` | Czcionki Fraunces i Inter (WOFF2, zmienna grubość, znaki łacińskie i polskie) z licencjami SIL OFL 1.1 |
 | `assets/filmy/` | Filmy 1920×1080 do gry na ekranie |
-| `assets/filmy-720p/` | Lżejsze filmy 1280×720 do trybu „W pokoju” |
-| `assets/filmy-skok/` | Filmy, w których zwierzę wyskakuje z ramy w trybie „W pokoju” |
+| `assets/filmy-720p/` | Lżejsze filmy 1280×720 do trybu „W przestrzeni” |
+| `assets/filmy-skok/` | Filmy, w których zwierzę wyskakuje z ramy w trybie „W przestrzeni” |
 | `narzedzia/serwer.py` | Serwer do podglądu z obsługą nagłówka Range |
-| `test/` | Testy logiki gry, kodów QR i trybu „W pokoju” |
+| `test/` | Testy logiki gry, kodów QR i trybu „W przestrzeni” |
 
 Dokumentacja, narzędzia do filmów i materiały źródłowe, na które wskazują niektóre komentarze w kodzie, są w prywatnym repozytorium `lesne-puzzle-WebXR`. To repozytorium jest publiczne, więc zawiera tylko to, co jest potrzebne do działania gry i jej testów.
 

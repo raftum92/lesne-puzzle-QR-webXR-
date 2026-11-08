@@ -3,6 +3,7 @@ import { POLAND, RIVERS, VIEWBOX, project, smoothPath } from "./mapa.js";
 import { FACT_ICONS, UI, leaf } from "./ikony.js";
 import { formatTime } from "./postep.js";
 
+// Bez `next` (telefon z kodu QR, który ma jedno zwierzę) nie ma przycisku „Następne zwierzę”.
 export function renderInfo(container, animal, { result, next, onNext, onReplay, onAgain }) {
   const delay = (seconds) => `style="--d: ${seconds}s"`;
   container.innerHTML = `
@@ -28,9 +29,7 @@ export function renderInfo(container, animal, { result, next, onNext, onReplay, 
             .join("")}
         </ul>
         <div class="actions reveal" ${delay(1.15)}>
-          <button class="btn btn--primary" data-action="next" aria-label="Następne zwierzę: ${next.name}">
-            Następne zwierzę ${UI.arrow}
-          </button>
+          ${next ? `<button class="btn btn--primary" data-action="next" aria-label="Następne zwierzę: ${next.name}">Następne zwierzę ${UI.arrow}</button>` : ""}
           <button class="btn btn--ghost" data-action="replay">${UI.replay} Obejrzyj jeszcze raz</button>
           <button class="btn btn--ghost" data-action="again">${UI.puzzle} Ułóż jeszcze raz</button>
         </div>
@@ -44,7 +43,7 @@ export function renderInfo(container, animal, { result, next, onNext, onReplay, 
       </aside>
       <p class="credits reveal" ${delay(1.3)}>${animal.credits}</p>
     </div>`;
-  container.querySelector('[data-action="next"]').addEventListener("click", onNext);
+  container.querySelector('[data-action="next"]')?.addEventListener("click", onNext);
   container.querySelector('[data-action="replay"]').addEventListener("click", onReplay);
   container.querySelector('[data-action="again"]').addEventListener("click", onAgain);
 }

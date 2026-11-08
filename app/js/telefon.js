@@ -19,11 +19,9 @@ export function readPhoneLink(search) {
   return { animal, level: Object.hasOwn(LEVELS, level) ? level : "latwy" };
 }
 
-// Adres bez zwierzęcia i poziomu, żeby po odświeżeniu gra zaczynała się od ekranu tytułowego. Pozostałe parametry zostają.
-export function withoutPhoneLink({ pathname, search }) {
-  const params = new URLSearchParams(search);
-  params.delete("zwierze");
-  params.delete("poziom");
-  const rest = params.toString();
-  return pathname + (rest ? `?${rest}` : "");
+// Telefon albo tablet, a nie monitor na stanowisku. Ekran dotykowy tego nie rozstrzyga, bo monitor
+// w centrum nauki też może być dotykowy, a wtedy ma pokazywać kod QR, a nie tryb z kamerą.
+export function isHandheld({ userAgent = "", userAgentData, maxTouchPoints = 0, platform = "" }) {
+  if (userAgentData?.mobile || /Android|iPhone|iPad|iPod|Mobile/i.test(userAgent)) return true;
+  return platform === "MacIntel" && maxTouchPoints > 1; // iPad, który przedstawia się jak Mac
 }

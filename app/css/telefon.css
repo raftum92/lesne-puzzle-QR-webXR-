@@ -19,7 +19,7 @@
 /* Układanie na ekranie jest głównym wyborem, a kod QR mniejszym dodatkiem z boku. */
 .phone__options {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 216px;
+  grid-template-columns: minmax(0, 1fr) 236px;
   gap: 20px;
   align-items: stretch;
 }
@@ -80,6 +80,19 @@
   font-size: 12.5px;
   line-height: 1.4;
   color: var(--ink-faint);
+}
+
+/* Na którym telefonie tryb W przestrzeni działa w pełni: jaśniej niż reszta, bo od tego zależy, co zobaczy gracz. */
+.phone__tip {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+.phone__tip strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 /* Biały kwadrat z marginesem jest częścią kodu: aparat musi widzieć jasne tło także w ciemnym oknie. */

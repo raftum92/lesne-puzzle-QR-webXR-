@@ -8,7 +8,7 @@ Gra działa pod adresem: https://raftum92.github.io/lesne-puzzle-QR-webXR-/app/
 
 Gra jest pomyślana jako stanowisko w Centrum Nauki Experyment: zwiedzający układają obrazki głównie na monitorze, a telefon jest dodatkiem. Tryb „W przestrzeni” (WebXR) kładzie układankę na prawdziwej podłodze, widzianej przez kamerę telefonu. Monitor tego nie pokaże, więc kod QR przenosi jedno zwierzę na telefon:
 
-1. Na monitorze zwiedzający wybiera poziom i zwierzę, na przykład lisa. Otwiera się okno z dużym obrazkiem i przyciskiem „Ułóż na ekranie” (domyślny, działa też Enter). Obok jest mniejszy kod QR „Dodatkowo: ułóż w telefonie”.
+1. Na monitorze zwiedzający wybiera poziom i zwierzę, na przykład lisa. Otwiera się okno z dużym obrazkiem i przyciskiem „Ułóż na ekranie” (domyślny, działa też Enter). Obok jest mniejszy kod QR „Dodatkowo: ułóż w telefonie” z informacją, że najlepiej działa na Androidzie w Chrome, na telefonie z ARCore, a na innych telefonach, także na iPhonie, układa się na tle obrazu z kamery.
 2. Zwiedzający skanuje kod aparatem telefonu. Kod zawiera adres gry z wybranym zwierzęciem i poziomem, na przykład `app/?zwierze=lis&poziom=latwy`.
 3. Telefon pokazuje nazwę zwierzęcia i przycisk „Ułóż w przestrzeni” albo „Ułóż z kamerą”. Przeglądarka pozwala otworzyć sesję AR dopiero po dotknięciu, dlatego ten jeden przycisk musi zostać.
 4. Telefon ma tylko to jedno zwierzę: nie ma menu ani przycisku „Następne zwierzę”, a wyjście z gry wraca do ekranu tego zwierzęcia, także po odświeżeniu strony. Kolejne zwierzę wybiera się przy monitorze.

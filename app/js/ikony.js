@@ -46,6 +46,7 @@ export const UI = {
   puzzle: svg('<path d="M4.5 8h3.2a2.2 2.2 0 1 1 4.4 0h3.4v3.4a2.2 2.2 0 1 1 0 4.4v3.7h-11z"/>'),
   skip: svg('<path d="M6 5.5 15 12l-9 6.5z"/><path d="M18.5 5.5v13"/>'),
   clock: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  phone: svg('<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>'),
   star: svg('<path d="m12 3.8 2.5 5.2 5.7.8-4.1 4 1 5.7L12 16.8l-5.1 2.7 1-5.7-4.1-4 5.7-.8z"/>'),
   soundOn: svg('<path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>'),
   soundOff: svg('<path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/>'),

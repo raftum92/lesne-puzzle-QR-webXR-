@@ -26,7 +26,7 @@ export function phoneDialog({ title, meta, thumb, focus, link }) {
   $("phoneMeta").textContent = meta;
   $("phoneThumb").src = thumb;
   $("phoneThumb").style.objectPosition = focus;
-  $("phoneQr").innerHTML = qrSvg(link);
+  $("phoneQr").innerHTML = qrSvg(link, 160);
   dialog.returnValue = "";
   dialog.showModal();
   return new Promise((resolve) => {

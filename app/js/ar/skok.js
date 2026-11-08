@@ -1,4 +1,4 @@
-// Skok zwierzęcia z ramy w trybie „W pokoju”: pionowy film na zielonym tle, które znika w shaderze (rama.js).
+// Skok zwierzęcia z ramy w trybie „W przestrzeni”: pionowy film na zielonym tle, które znika w shaderze (rama.js).
 
 // Miejsce obrazu w filmie, jako ułamki kadru. Takie same we wszystkich filmach, bo klatkę startową składa
 // narzedzia/rama.py, a Veo zostawia ramę tam, gdzie była.

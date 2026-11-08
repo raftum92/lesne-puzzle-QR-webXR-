@@ -8,18 +8,21 @@ import { Game } from "./gra.js";
 import { confirmDialog, openAbout, phoneDialog, setupDialogs } from "./dialogi.js";
 import { LOGO, UI } from "./ikony.js";
 import { LEVELS, pieceCount, piecesLabel } from "./poziomy.js";
-import { phoneLink, readPhoneLink, withoutPhoneLink } from "./telefon.js";
+import { isHandheld, phoneLink, readPhoneLink } from "./telefon.js";
 import { detectAr } from "./ar/wykrywanie.js";
 
 const $ = (id) => document.getElementById(id);
 const app = $("app");
 const video = $("video");
 const progress = new Progress();
+// Telefon po zeskanowaniu kodu QR: tylko to jedno zwierzę, bez menu. Kolejne zwierzę wybiera się przy monitorze.
+const visit = readPhoneLink(location.search);
+const handheld = isHandheld(navigator);
 const sounds = new Sounds("media/las.wav");
 const backdrop = new Backdrop($("backdrop"));
 let ignorePop = false; // wyjście przyciskiem w aplikacji samo cofa historię przeglądarki
 let arKind = null; // "xr", "kamera", "symulacja" albo null, gdy urządzenie gra tylko na ekranie
-let arGame = null; // obietnica gry w trybie „W pokoju”; Three.js ładuje się tylko na urządzeniach z AR
+let arGame = null; // obietnica gry w trybie „W przestrzeni”; Three.js ładuje się tylko na urządzeniach z AR
 let arCurrent = null;
 
 for (const el of document.querySelectorAll("[data-icon]")) el.innerHTML = UI[el.dataset.icon];
@@ -33,6 +36,7 @@ const game = new Game({
   progress,
   backdrop,
   confirm: confirmDialog,
+  oneAnimal: Boolean(visit),
   onExit: backToMenu,
   onNavigate: (id) => history.replaceState({ screen: "game" }, "", `#${id}`),
 });
@@ -67,9 +71,8 @@ function boot() {
     current.requestExit();
   });
   const arReady = setupAr();
-  const link = readPhoneLink(location.search);
-  if (link) {
-    setupPhoneLanding(link, arReady);
+  if (visit) {
+    setupPhoneLanding(arReady);
   } else {
     const enter = $("enterButton");
     enter.addEventListener("click", start, { once: true });
@@ -78,42 +81,51 @@ function boot() {
 }
 
 async function setupAr() {
-  arKind = await detectAr({ location, navigator, touch: matchMedia("(pointer: coarse)").matches });
+  arKind = await detectAr({ location, navigator, handheld });
   if (!arKind) return;
   menu.enableModes(arKind);
   if (arKind === "kamera") return; // kamera nie wymaga świeżego dotknięcia, więc Three.js załaduje się dopiero do gry
   await loadArGame().catch(() => {}); // błąd ładowania obsłuży dopiero dotknięcie zwierzęcia
 }
 
-// Telefon po zeskanowaniu kodu QR: od razu to zwierzę i ten poziom. Sesję AR wolno otworzyć dopiero
-// po dotknięciu, więc zostaje jeden przycisk. Włącza się po wczytaniu Three.js, bo przeglądarka
-// odrzuca sesję, gdy od dotknięcia minęło za dużo czasu.
-async function setupPhoneLanding(link, arReady) {
-  const animal = ANIMALS[link.animal];
-  const level = LEVELS[link.level];
+// Ekran tytułowy telefonu z kodu QR: to zwierzę, ten poziom i jeden przycisk. Sesję AR wolno otworzyć dopiero
+// po dotknięciu, a przycisk włącza się po wczytaniu Three.js, bo przeglądarka odrzuca sesję, gdy od dotknięcia
+// minęło za dużo czasu. Na ten ekran gra wraca też z układanki, bo telefon nie ma menu.
+async function setupPhoneLanding(arReady) {
+  const animal = ANIMALS[visit.animal];
   const enter = $("enterButton");
   backdrop.set(animal.thumb);
-  document.title = `${animal.name} · Leśne puzzle`;
   $("titleHeading").textContent = animal.name;
   $("titleHeading").classList.add("title__heading--animal");
-  $("titleText").textContent = `Poziom ${level.name.toLowerCase()} · ${piecesLabel(pieceCount(level))}`;
   enter.textContent = "Chwileczkę…";
   await arReady;
-  enter.textContent = !arKind ? "Ułóż na ekranie" : arKind === "kamera" ? "Ułóż z kamerą" : "Ułóż w pokoju";
-  if (!arKind) $("titleText").textContent = "To urządzenie nie obsługuje trybu W pokoju, ale obrazek ułożysz na ekranie.";
-  if (arKind === "kamera") $("titleText").textContent = "Ten telefon nie ma pełnego trybu W pokoju, więc obrazek ułożysz na tle obrazu z kamery.";
-  enter.addEventListener("click", () => startFromLink(link), { once: true });
+  showLanding();
+  enter.addEventListener("click", startFromLink);
   enter.disabled = false;
 }
 
-function startFromLink(link) {
+// Napisy zależą od trybu, który po nieudanym starcie AR mógł się zmienić na kamerę.
+function showLanding() {
+  const animal = ANIMALS[visit.animal];
+  const level = LEVELS[visit.level];
+  document.title = `${animal.name} · Leśne puzzle`;
+  $("enterButton").textContent = !arKind ? "Ułóż na ekranie" : arKind === "kamera" ? "Ułóż z kamerą" : "Ułóż w przestrzeni";
+  $("titleText").textContent =
+    arKind === "kamera"
+      ? "Ten telefon nie ma pełnego trybu W przestrzeni, więc obrazek ułożysz na tle obrazu z kamery."
+      : !arKind
+        ? "To urządzenie nie obsługuje trybu W przestrzeni, ale obrazek ułożysz na ekranie."
+        : `Poziom ${level.name.toLowerCase()} · ${piecesLabel(pieceCount(level))}`;
+}
+
+function startFromLink() {
+  if (app.dataset.screen !== "title") return;
   sounds.unlock();
   unlockVideo();
   sounds.startAmbience(2.5);
   sounds.tap();
   if (arKind) menu.selectMode("pokoj", { silent: true });
-  history.replaceState(null, "", withoutPhoneLink(location));
-  launch(link.animal, link.level, null);
+  launch(visit.animal, visit.level, null);
 }
 
 function loadArGame() {
@@ -125,6 +137,7 @@ function loadArGame() {
       video,
       kind: arKind,
       cameraFallback: Boolean(navigator.mediaDevices?.getUserMedia),
+      oneAnimal: Boolean(visit),
       onKindChange: (kind) => {
         arKind = kind;
         menu.nameModes(kind);
@@ -147,12 +160,14 @@ async function offerScreenMode(failures = []) {
   const camera = arKind === "kamera";
   const code = failures.length ? ` Kod błędu: ${failures.join(", ")}.` : "";
   const toScreen = await confirmDialog({
-    title: camera ? "Nie udało się włączyć kamery" : "Nie udało się uruchomić trybu W pokoju",
+    title: camera ? "Nie udało się włączyć kamery" : "Nie udało się uruchomić trybu W przestrzeni",
     text: (camera ? "Zezwól przeglądarce na użycie kamery albo zagraj na ekranie." : "Możesz zagrać na ekranie.") + code,
     confirm: "Zagraj na ekranie",
     cancel: "Zamknij",
   });
-  if (toScreen) menu.selectMode("ekran");
+  if (!toScreen) return;
+  menu.selectMode("ekran");
+  if (visit) launch(visit.animal, visit.level, null); // telefon z kodu QR nie ma menu, z którego dałoby się zacząć
 }
 
 function activeGame() {
@@ -191,8 +206,8 @@ async function play(animalId, levelId, from) {
   if (app.dataset.screen === "game" || app.dataset.screen === "ar") return; // podwójne kliknięcie karty
   sounds.unlock();
   sounds.tap();
-  // Na komputerze bez AR gracz wybiera: układanie na ekranie albo kod QR, który przenosi grę na telefon.
-  if (!arKind && matchMedia("(hover: hover) and (pointer: fine)").matches) {
+  // Na monitorze gracz wybiera: układanie na ekranie albo, dodatkowo, kod QR, który przenosi grę na telefon.
+  if (!arKind && !handheld) {
     const animal = ANIMALS[animalId];
     const level = LEVELS[levelId];
     const onScreen = await phoneDialog({
@@ -214,7 +229,7 @@ function launch(animalId, levelId, from) {
     loadArGame()
       .then((ar) => ar.start(animalId, levelId))
       .catch((error) => {
-        console.warn("Nie udało się uruchomić trybu W pokoju:", error);
+        console.warn("Nie udało się uruchomić trybu W przestrzeni:", error);
         backToMenu();
         offerScreenMode();
       });
@@ -225,10 +240,16 @@ function launch(animalId, levelId, from) {
 }
 
 function backToMenu() {
-  showScreen("menu");
-  menu.show();
+  if (visit) {
+    showScreen("title");
+    showLanding();
+    $("enterButton").focus({ preventScroll: true });
+  } else {
+    showScreen("menu");
+    menu.show();
+    document.title = "Leśne puzzle";
+  }
   sounds.startAmbience(2);
-  document.title = "Leśne puzzle";
   if (history.state?.screen === "game") {
     ignorePop = true;
     history.back();

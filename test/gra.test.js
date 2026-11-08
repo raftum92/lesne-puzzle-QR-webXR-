@@ -1,4 +1,4 @@
-// Gra na ekranie na atrapach: element wideo jest wspólny z trybem „W pokoju”.
+// Gra na ekranie na atrapach: element wideo jest wspólny z trybem „W przestrzeni”.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -51,7 +51,7 @@ test("wyjście z gry zwalnia jej film", async () => {
   assert.equal(video.loads, 1);
 });
 
-test("wyjście z gry nie zabiera filmu trybowi W pokoju", async () => {
+test("wyjście z gry nie zabiera filmu trybowi W przestrzeni", async () => {
   const { game, video } = makeGame("../assets/filmy/lis.mp4");
   game.stop();
   video.setAttribute("src", "../assets/filmy-720p/sowa.mp4");

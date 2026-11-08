@@ -233,7 +233,7 @@ for (const id of ORDER) {
     thumb: `media/${id}-mini.jpg`,
     video: `../assets/filmy/${id}.mp4`,
     arVideo: `../assets/filmy-720p/${id}.mp4`,
-    // Skok z ramy w trybie „W pokoju”, po zwykłym filmie.
+    // Skok z ramy w trybie „W przestrzeni”, po zwykłym filmie.
     jump: { video: `../assets/filmy-skok/${id}.mp4`, vibrateAt: VIBRATE_AT[id] },
   });
 }

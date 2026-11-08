@@ -34,16 +34,16 @@ test("sprawdza dokładnie immersive-ar", async () => {
 test("telefon bez AR, ale z kamerą, dostaje tryb z kamerą", async () => {
   const location = { hostname: "example.com", search: "" };
   const mediaDevices = { getUserMedia: async () => ({}) };
-  assert.equal(await detectAr({ location, navigator: { xr: xr(false), mediaDevices }, touch: true }), "kamera");
-  assert.equal(await detectAr({ location, navigator: { mediaDevices }, touch: true }), "kamera");
-  assert.equal(await detectAr({ location, navigator: { xr: xr(true), mediaDevices }, touch: true }), "xr");
+  assert.equal(await detectAr({ location, navigator: { xr: xr(false), mediaDevices }, handheld: true }), "kamera");
+  assert.equal(await detectAr({ location, navigator: { mediaDevices }, handheld: true }), "kamera");
+  assert.equal(await detectAr({ location, navigator: { xr: xr(true), mediaDevices }, handheld: true }), "xr");
 });
 
 test("komputer z kamerką i telefon bez kamery grają na ekranie", async () => {
   const location = { hostname: "example.com", search: "" };
   const mediaDevices = { getUserMedia: async () => ({}) };
-  assert.equal(await detectAr({ location, navigator: { xr: xr(false), mediaDevices }, touch: false }), null);
-  assert.equal(await detectAr({ location, navigator: { xr: xr(false) }, touch: true }), null);
+  assert.equal(await detectAr({ location, navigator: { xr: xr(false), mediaDevices }, handheld: false }), null);
+  assert.equal(await detectAr({ location, navigator: { xr: xr(false) }, handheld: true }), null);
 });
 
 test("tryb z kamerą da się wymusić tylko lokalnie", async () => {

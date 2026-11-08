@@ -5,7 +5,7 @@ import { UI, gridIcon, leaf } from "./ikony.js";
 import { formatTime } from "./postep.js";
 
 const MODE_ORDER = ["ekran", "pokoj"];
-const MODE_NAMES = { ekran: "Na ekranie", pokoj: "W pokoju" };
+const MODE_NAMES = { ekran: "Na ekranie", pokoj: "W przestrzeni" };
 const CAMERA_MODE_NAMES = { ekran: "Na ekranie", pokoj: "Z kamerą" };
 
 export class Menu {
@@ -38,7 +38,7 @@ export class Menu {
     this.nameModes(kind);
   }
 
-  // Osobno, bo telefon, na którym sesja AR nie ruszyła, zmienia w trakcie „W pokoju” na „Z kamerą”.
+  // Osobno, bo telefon, na którym sesja AR nie ruszyła, zmienia w trakcie „W przestrzeni” na „Z kamerą”.
   nameModes(kind) {
     const names = kind === "kamera" ? CAMERA_MODE_NAMES : MODE_NAMES;
     this.modes.innerHTML = MODE_ORDER.map(

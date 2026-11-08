@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PUBLIC_URL, phoneLink, readPhoneLink, withoutPhoneLink } from "../app/js/telefon.js";
+import { PUBLIC_URL, isHandheld, phoneLink, readPhoneLink } from "../app/js/telefon.js";
 import { ORDER } from "../app/js/zwierzeta.js";
 import { LEVEL_ORDER } from "../app/js/poziomy.js";
 
@@ -37,7 +37,17 @@ test("nieznany poziom liczy się jako łatwy", () => {
   assert.deepEqual(readPhoneLink("?zwierze=lis&poziom=toString"), { animal: "lis", level: "latwy" });
 });
 
-test("czyszczenie adresu zostawia pozostałe parametry", () => {
-  assert.equal(withoutPhoneLink({ pathname: "/app/", search: "?zwierze=lis&poziom=latwy" }), "/app/");
-  assert.equal(withoutPhoneLink({ pathname: "/app/", search: "?ar=symulacja&zwierze=lis&poziom=latwy&debug=1" }), "/app/?ar=symulacja&debug=1");
+test("telefony i tablety to urządzenia w ręku, a monitor, także dotykowy, nie", () => {
+  const android = "Mozilla/5.0 (Linux; Android 14; moto g13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36";
+  const iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+  const tablet = "Mozilla/5.0 (Linux; Android 13; SM-X200) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
+  const windows = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36";
+  const mac = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
+  assert.equal(isHandheld({ userAgent: android }), true);
+  assert.equal(isHandheld({ userAgent: iphone }), true);
+  assert.equal(isHandheld({ userAgent: tablet }), true);
+  assert.equal(isHandheld({ userAgent: windows, userAgentData: { mobile: true } }), true);
+  assert.equal(isHandheld({ userAgent: mac, platform: "MacIntel", maxTouchPoints: 5 }), true, "iPad udający Maca");
+  assert.equal(isHandheld({ userAgent: windows, userAgentData: { mobile: false }, maxTouchPoints: 10, platform: "Win32" }), false, "dotykowy monitor na stanowisku");
+  assert.equal(isHandheld({ userAgent: mac, platform: "MacIntel", maxTouchPoints: 0 }), false);
 });

@@ -30,7 +30,7 @@ import {
 const H = 9 / 16;
 
 test("stałe mają wartości ze specyfikacji", () => {
-  assert.deepEqual(BOARD_METERS, { mala: 0.5, duza: 1 });
+  assert.deepEqual(BOARD_METERS, { mala: 0.5, duza: 0.8 });
   assert.equal(BOARD_H, H);
   assert.equal(FRAME_SCALE, 1.5);
   assert.equal(THICKNESS, 0.012);
@@ -241,7 +241,7 @@ test("aimSpot: plansza z elementami pod nią wisi tam, gdzie celuje telefon, prz
 
 // Obie plansze w tej samej odległości: duża jest na ekranie większa, a nie tylko dalej (OnePlus Nord 4, 9.11.2026:
 // gdy duża wisiała proporcjonalnie dalej, obie zajmowały 84% szerokości ekranu).
-test("aimSpot: na zwykłym telefonie plansza wisi około 1 m od gracza, a duża jest na ekranie 2 razy większa", () => {
+test("aimSpot: na zwykłym telefonie plansza wisi około 1 m od gracza, a duża jest na ekranie 1,6 raza większa", () => {
   const eye = { x: 0, y: 1.5, z: 0 };
   const spot = aimSpot(eye, { x: 0, y: 0, z: -1 }, PHONE.x, PHONE.y);
   const far = -spot.position.z;
@@ -249,7 +249,7 @@ test("aimSpot: na zwykłym telefonie plansza wisi około 1 m od gracza, a duża 
   assert.ok(far > 0.85 && far < 1.15, `odległość: ${far}`);
   const share = (meters) => meters / (2 * far * PHONE.x);
   assert.ok(share(BOARD_METERS.mala) < 1, "mała plansza mieści się w szerokości ekranu");
-  assert.ok(Math.abs(share(BOARD_METERS.duza) / share(BOARD_METERS.mala) - 2) < 1e-9, "duża 2 razy większa");
+  assert.ok(Math.abs(share(BOARD_METERS.duza) / share(BOARD_METERS.mala) - 1.6) < 1e-9, "duża 1,6 raza większa");
 });
 
 test("aimSpot: węższy kadr odsuwa planszę", () => {

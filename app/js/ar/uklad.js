@@ -3,7 +3,7 @@
 // Na metry przelicza to skala grupy z planszą. W trybie W przestrzeni plansza wisi przed graczem, zwrócona do niego
 // (boardPose, aimSpot): oś z idzie wtedy mniej więcej w dół, a oś y do gracza, więc „przed planszą” znaczy „pod nią”.
 
-export const BOARD_METERS = { mala: 0.5, duza: 1 };
+export const BOARD_METERS = { mala: 0.5, duza: 0.8 };
 export const BOARD_H = 9 / 16;
 export const FRAME_SCALE = 1.5; // ile razy rama jest szersza od planszy
 export const THICKNESS = 0.012; // grubość elementu

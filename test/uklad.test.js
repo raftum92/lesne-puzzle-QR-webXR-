@@ -14,6 +14,7 @@ import {
   TILT,
   UPRIGHT_PIVOT,
   aimSpot,
+  areaInView,
   boardPose,
   cellSize,
   targetOf,
@@ -269,4 +270,14 @@ test("intersectBoard: promień w dół trafia, a prawie poziomy nie", () => {
   assert.equal(intersectBoard({ x: 0, y: 1, z: 0 }, { x: 0, y: 0.2, z: 1 }), null);
   assert.equal(intersectBoard({ x: 0, y: 1, z: 0 }, { x: 0, y: -0.01, z: 1 }), null);
   assert.equal(intersectBoard({ x: 0, y: -1, z: 0 }, { x: 0, y: -1, z: 0 }), null);
+});
+
+test("areaInView: plansza na wprost jest w kadrze, z boku, za plecami i daleko obok nie", () => {
+  const meters = BOARD_METERS.mala;
+  assert.equal(areaInView({ x: 0, y: 0, z: -1 }, meters, PHONE.x, PHONE.y), true, "na wprost");
+  assert.equal(areaInView({ x: 0.4, y: 0, z: -1 }, meters, PHONE.x, PHONE.y), true, "wystaje z boku kadru");
+  assert.equal(areaInView({ x: 1, y: 0, z: 0 }, meters, PHONE.x, PHONE.y), false, "90° w bok");
+  assert.equal(areaInView({ x: 0, y: 0, z: 1 }, meters, PHONE.x, PHONE.y), false, "za plecami");
+  assert.equal(areaInView({ x: 2.5, y: -1.9, z: -2.6 }, meters, PHONE.x, PHONE.y), false, "57° obok, jak na telefonie 9.11.2026");
+  assert.equal(areaInView({ x: 0, y: -1.2, z: -1 }, meters, PHONE.x, PHONE.y), false, "daleko pod kadrem");
 });

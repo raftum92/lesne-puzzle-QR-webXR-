@@ -6,7 +6,7 @@ import { createCuts } from "../ksztalty.js";
 import { renderInfo } from "../info.js";
 import { createSession, poseBoard } from "./sesja.js";
 import { Animator } from "./animacje.js";
-import { BOARD_H, BOARD_METERS, LIFT, UPRIGHT_PIVOT, aimSpot, planFrontHomes, planHomes, targetOf } from "./uklad.js";
+import { BOARD_H, BOARD_METERS, LIFT, UPRIGHT_PIVOT, aimSpot, areaInView, planFrontHomes, planHomes, targetOf } from "./uklad.js";
 import { Frame } from "./rama.js";
 import { JUMP_FADE_MS, canJump, jumpDue } from "./skok.js";
 import { Dragger } from "./przeciaganie.js";
@@ -29,6 +29,8 @@ const HINT_AIM = "Ustaw planszę przed sobą i dotknij ekranu";
 const HINT_LEVEL = "Skieruj telefon przed siebie";
 const HINT_CAMERA = "Zezwól przeglądarce na użycie kamery";
 const HINT_TRACKING = "Powoli porusz telefonem, żeby gra znów widziała pokój";
+const HINT_LOST = "Plansza jest poza ekranem. Dotknij ekranu, żeby ją przywołać";
+const LOST_MS = 2000; // tyle plansza może być poza kadrem, zanim gra zaproponuje jej przywołanie
 const HINT_IMAGE = "Nie udało się wczytać obrazka. Sprawdź połączenie i spróbuj ponownie.";
 const PIECE_Y = 0.002; // elementy leżą minimalnie nad planszą
 const STACK_STEP = 0.0003; // każdy upuszczony element leży trochę wyżej, żeby nakładające się nie migotały
@@ -184,6 +186,7 @@ export class ArGame {
     this.countFrame(time);
     if (this.jumpArmed && jumpDue(this.video.currentTime, this.video.duration)) this.beginJump();
     if (this.phase === "placing") this.updateOutline(time, tracking);
+    if (this.phase === "puzzle") this.watchBoard(time, tracking);
     if (this.dragger) {
       this.dragger.enabled = tracking;
       if (!tracking) this.dragger.cancel();
@@ -216,8 +219,40 @@ export class ArGame {
     return this.spot ? HINT_AIM : HINT_LEVEL;
   }
 
+  // Plansza poza kadrem przez LOST_MS, na przykład gdy gracz się obrócił albo ARCore ją przesunął: podpowiedź,
+  // a dotknięcie ekranu ją przywołuje (recall). W czasie przeciągania elementu plansza nie znika z gry.
+  watchBoard(time, tracking) {
+    const { session } = this;
+    if (!session.upright || !session.view || !tracking || this.dragger?.drag) return;
+    if (boardInView(session, BOARD_METERS[this.size])) {
+      this.offscreenSince = null;
+      if (this.lost) {
+        this.lost = false;
+        this.setHint("");
+      }
+      return;
+    }
+    this.offscreenSince ??= time;
+    if (!this.lost && time - this.offscreenSince >= LOST_MS) {
+      this.lost = true;
+      this.setHint(HINT_LOST);
+    }
+  }
+
+  // Stawia planszę z ułożonymi elementami tam, gdzie celuje telefon, tak jak obrys przy ustawianiu.
+  recall() {
+    const { view } = this.session;
+    const spot = view && aimSpot(view.eye, view.forward, view.tanHalfFov, view.tanHalfFovY);
+    if (!spot) return this.setHint(HINT_LEVEL);
+    this.session.placeBoard(BOARD_METERS[this.size], spot);
+    this.lost = false;
+    this.offscreenSince = null;
+    this.setHint("");
+  }
+
   pointer(type, ray, id) {
-    if (this.phase === "puzzle") this.dragger?.pointer(type, ray, id);
+    if (this.phase === "puzzle" && this.lost && type === "down") this.recall();
+    else if (this.phase === "puzzle") this.dragger?.pointer(type, ray, id);
     else if (type === "down" && this.phase === "placing" && this.spot) {
       if (this.boardPlaced) this.finishMove();
       else this.place();
@@ -805,6 +840,8 @@ export class ArGame {
     this.boardPlaced = false;
     this.placingSince = null;
     this.spot = null;
+    this.lost = false;
+    this.offscreenSince = null;
     this.tracking = true;
     this.hidden = false;
     this.retry = null;
@@ -858,6 +895,13 @@ function disposeObject(root) {
       material?.dispose();
     }
   });
+}
+
+// Czy wisząca plansza z elementami choć częściowo mieści się w kadrze telefonu.
+function boardInView(session, meters) {
+  const { eye, quaternion, tanHalfFov, tanHalfFovY } = session.view;
+  const local = session.placement.position.clone().sub(eye).applyQuaternion(quaternion.clone().invert());
+  return areaInView(local, meters, tanHalfFov, tanHalfFovY);
 }
 
 // Prostokątny obrys planszy z czterech pasków. Ma te same trzy poziomy grup co plansza w sesji (sesja.js),

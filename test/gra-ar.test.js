@@ -341,6 +341,53 @@ test("duża plansza wisi tam, gdzie mała, i jest od niej większa", async () =>
   finish(game);
 });
 
+// Plansza 4,7 m od telefonu i 57° obok kierunku kamery: gracz jej nie widział (OnePlus Nord 4, 9.11.2026).
+async function puzzleInFront() {
+  const { game, renderer } = makeGame();
+  xrApi.requestSession = async () => fakeXr();
+  await game.start("lis", "latwy");
+  const eye = { x: 0, y: 1.4, z: 0 };
+  renderer.loop(0, xrFrame(viewerPose(eye)));
+  game.pointer("down", { origin: new Vector3(), direction: new Vector3(0, 0, -1) }, 1);
+  game.phase = "puzzle"; // obraz i rozsypanie nie są tu potrzebne
+  game.setHint("");
+  return { game, renderer, eye };
+}
+
+test("plansza poza ekranem przez 2 s: podpowiedź, a dotknięcie przywołuje ją przed telefon", async () => {
+  const { game, renderer, eye } = await puzzleInFront();
+  const away = xrFrame(viewerPose(eye, { yaw: Math.PI })); // gracz odwraca się plecami do planszy
+  renderer.loop(1000, away);
+  renderer.loop(2500, away);
+  assert.equal(game.el.hint.textContent, "", "chwilowe odwrócenie wzroku niczego nie zmienia");
+  renderer.loop(3100, away);
+  assert.match(game.el.hint.textContent, /poza ekranem/);
+  game.pointer("down", { origin: new Vector3(), direction: new Vector3(0, 0, 1) }, 2);
+  assert.equal(game.phase, "puzzle");
+  assert.ok(game.session.placement.position.z > 0.5, "plansza przed telefonem, w nowym kierunku");
+  assert.equal(game.el.hint.textContent, "");
+  renderer.loop(3200, away);
+  renderer.loop(6000, away);
+  assert.equal(game.el.hint.textContent, "", "przywołana plansza jest w kadrze");
+  finish(game);
+});
+
+test("plansza odnaleziona wzrokiem chowa podpowiedź, a dotknięcie znów przeciąga elementy", async () => {
+  const { game, renderer, eye } = await puzzleInFront();
+  const at = game.session.placement.position.clone();
+  renderer.loop(1000, xrFrame(viewerPose(eye, { yaw: Math.PI })));
+  renderer.loop(3500, xrFrame(viewerPose(eye, { yaw: Math.PI })));
+  assert.match(game.el.hint.textContent, /poza ekranem/);
+  renderer.loop(3600, xrFrame(viewerPose(eye)));
+  assert.equal(game.el.hint.textContent, "");
+  const dragged = [];
+  game.dragger = { pointer: (...args) => dragged.push(args), drag: null, cancel() {} };
+  game.pointer("down", { origin: new Vector3(), direction: new Vector3(0, 0, -1) }, 3);
+  assert.equal(dragged.length, 1, "dotknięcie trafia do przeciągania");
+  assert.ok(game.session.placement.position.distanceTo(at) < 1e-9, "plansza została na miejscu");
+  finish(game);
+});
+
 test("dotknięcie ekranu zostawia planszę tam, gdzie wisi obrys", async () => {
   const { game, renderer } = makeGame();
   xrApi.requestSession = async () => fakeXr();

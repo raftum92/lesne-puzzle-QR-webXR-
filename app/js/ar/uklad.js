@@ -135,6 +135,16 @@ export function boardPose(tilt, pivotZ) {
   return { tilt, lift: pivotZ * Math.sin(tilt), back: -pivotZ * Math.cos(tilt), offset: { x: -0.5, z: 0 } };
 }
 
+// Czy plansza z elementami pod nią choć częściowo mieści się w kadrze. `local` to środek całości (UPRIGHT_PIVOT)
+// w układzie kamery, która patrzy w stronę -z, a tangensy to połowy kąta widzenia w poziomie i w pionie.
+export function areaInView(local, meters, tanHalfFov, tanHalfFovY) {
+  const depth = -local.z;
+  if (depth <= 0) return false;
+  const halfWidth = (FRONT_PITCH / 2) * meters;
+  const halfHeight = (FRONT_BOTTOM / 2) * meters;
+  return Math.abs(local.x) - halfWidth < depth * tanHalfFov && Math.abs(local.y) - halfHeight < depth * tanHalfFovY;
+}
+
 // Nachylenie, przy którym przód planszy w `position` patrzy prosto na telefon w `eye`.
 export function facingTilt(eye, position) {
   return Math.PI / 2 - Math.atan2(eye.y - position.y, Math.hypot(eye.x - position.x, eye.z - position.z));

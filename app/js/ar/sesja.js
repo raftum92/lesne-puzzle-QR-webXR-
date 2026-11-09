@@ -37,7 +37,7 @@ class Session {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.01, 40);
     this.surface = null; // stałe miejsce planszy w trybie z kamerą
-    this.view = null; // skąd i dokąd patrzy telefon: { eye, forward, tanHalfFov, tanHalfFovY }
+    this.view = null; // skąd i dokąd patrzy telefon: { eye, forward, quaternion, tanHalfFov, tanHalfFovY }
     this.tracking = true;
     this.visibilityState = "visible";
     this.ended = false;
@@ -428,7 +428,8 @@ class SimulatedSession extends CanvasSession {
   frame(time) {
     const forward = this.camera.getWorldDirection(new THREE.Vector3());
     const tanHalfFovY = Math.tan((this.camera.fov * Math.PI) / 360);
-    this.view = { eye: this.camera.position.clone(), forward, tanHalfFov: tanHalfFovY * this.camera.aspect, tanHalfFovY };
+    const quaternion = this.camera.quaternion.clone();
+    this.view = { eye: this.camera.position.clone(), forward, quaternion, tanHalfFov: tanHalfFovY * this.camera.aspect, tanHalfFovY };
     super.frame(time);
   }
 
@@ -491,6 +492,7 @@ function viewOf(pose) {
   return {
     eye: new THREE.Vector3(position.x, position.y, position.z),
     forward: new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion),
+    quaternion,
     tanHalfFov: tangent(projection?.[0], DEFAULT_TAN_HALF_FOV),
     tanHalfFovY: tangent(projection?.[5], DEFAULT_TAN_HALF_FOV * 2),
   };

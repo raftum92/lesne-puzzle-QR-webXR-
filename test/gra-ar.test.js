@@ -98,8 +98,16 @@ function fakeRenderer() {
   };
 }
 
-function fakeXr({ failHitTest = false } = {}) {
-  const xr = new EventTarget();
+// Jak w Chrome 143: renderState leży w prototypie i ma pole layers także bez funkcji "layers".
+class FakeXrSession extends EventTarget {
+  get renderState() {
+    return { layers: [], depthNear: 0.1 };
+  }
+}
+
+function fakeXr({ failHitTest = false, features = ["local", "viewer", "hit-test", "dom-overlay", "anchors"] } = {}) {
+  const xr = new FakeXrSession();
+  xr.enabledFeatures = features;
   xr.endCalls = 0;
   xr.visibilityState = "visible";
   xr.end = async () => {
@@ -182,6 +190,31 @@ test("koniec układania czyści podpowiedź", () => {
   assert.equal(game.phase, "reveal");
   assert.equal(game.el.hint.textContent, "");
   finish(game);
+});
+
+// Chrome 143 nie pokazuje obrazu z XRProjectionLayer w sesji bez funkcji "layers" (OnePlus Nord 4, 9.11.2026).
+test("bez funkcji layers Three.js rysuje przez XRWebGLLayer", async () => {
+  const renderer = fakeRenderer();
+  let layersSeen = "nie sprawdzono";
+  renderer.xr.setSession = async (session) => {
+    layersSeen = session.renderState.layers;
+  };
+  const xr = fakeXr();
+  xrApi.requestSession = async () => xr;
+  await new XrSession(new FakeElement(), renderer).start();
+  assert.equal(layersSeen, undefined);
+  assert.deepEqual(xr.renderState.layers, [], "po starcie sesja pokazuje prawdziwy stan");
+});
+
+test("z funkcją layers Three.js może użyć XRProjectionLayer", async () => {
+  const renderer = fakeRenderer();
+  let layersSeen = "nie sprawdzono";
+  renderer.xr.setSession = async (session) => {
+    layersSeen = session.renderState.layers;
+  };
+  xrApi.requestSession = async () => fakeXr({ features: ["local", "viewer", "hit-test", "dom-overlay", "layers"] });
+  await new XrSession(new FakeElement(), renderer).start();
+  assert.deepEqual(layersSeen, []);
 });
 
 test("błąd w jednej klatce nie zatrzymuje pętli AR", async () => {

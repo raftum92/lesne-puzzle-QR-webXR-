@@ -131,7 +131,7 @@ export class XrSession extends Session {
       renderer.xr.enabled = true;
       renderer.xr.setFramebufferScaleFactor(XR_RESOLUTION);
       renderer.xr.setReferenceSpaceType("local");
-      await renderer.xr.setSession(session);
+      await setSessionWithoutLayers(renderer, session);
       this.space = renderer.xr.getReferenceSpace();
       const viewer = await session.requestReferenceSpace("viewer");
       this.hitSource = await session.requestHitTestSource({ space: viewer });
@@ -430,6 +430,27 @@ class SimulatedSession extends CanvasSession {
     );
     this.camera.lookAt(0, 0, 0);
     this.camera.updateMatrixWorld();
+  }
+}
+
+// Three.js 0.170 rysuje przez XRProjectionLayer, gdy tylko sesja ma pole renderState.layers. Chrome 143 na Androidzie
+// ma je także w sesji bez funkcji "layers", a wtedy obraz z tej warstwy nie trafia na ekran: każda klatka kończy się
+// błędem GL_INVALID_FRAMEBUFFER_OPERATION i nie widać ani obrysu, ani planszy (OnePlus Nord 4, 9.11.2026).
+// Specyfikacja pozwala na warstwy dopiero z funkcją "layers", więc bez niej Three.js wybiera XRWebGLLayer.
+async function setSessionWithoutLayers(renderer, session) {
+  if (session.enabledFeatures?.includes("layers")) return renderer.xr.setSession(session);
+  // Pole czyta tylko setSession, więc zasłona znika zaraz po nim.
+  Object.defineProperty(session, "renderState", {
+    configurable: true,
+    get() {
+      const state = Reflect.get(Object.getPrototypeOf(session), "renderState", session);
+      return new Proxy(state, { get: (target, key) => (key === "layers" ? undefined : Reflect.get(target, key)) });
+    },
+  });
+  try {
+    await renderer.xr.setSession(session);
+  } finally {
+    delete session.renderState;
   }
 }
 

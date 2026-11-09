@@ -1,8 +1,8 @@
 // Gra AR i sesja WebXR na atrapach: sytuacje, których symulator nie umie odtworzyć.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Group } from "../app/vendor/three.module.min.js";
-import { targetOf } from "../app/js/ar/uklad.js";
+import { Euler, Group, Quaternion, Vector3 } from "../app/vendor/three.module.min.js";
+import { BOARD_H, BOARD_METERS, FRAME_SCALE, UPRIGHT_PIVOT, aimSpot, targetOf } from "../app/js/ar/uklad.js";
 
 globalThis.location = new URL("http://localhost/app/");
 globalThis.matchMedia = () => ({ matches: false });
@@ -47,7 +47,7 @@ class FakeVideo extends EventTarget {
 }
 
 const { ArGame } = await import("../app/js/ar/gra-ar.js");
-const { XrSession } = await import("../app/js/ar/sesja.js");
+const { CameraSession, XrSession } = await import("../app/js/ar/sesja.js");
 const { Frame } = await import("../app/js/ar/rama.js");
 const { LEVELS } = await import("../app/js/poziomy.js");
 
@@ -98,8 +98,16 @@ function fakeRenderer() {
   };
 }
 
-function fakeXr({ failHitTest = false } = {}) {
-  const xr = new EventTarget();
+// Jak w Chrome 143: renderState leży w prototypie i ma pole layers także bez funkcji "layers".
+class FakeXrSession extends EventTarget {
+  get renderState() {
+    return { layers: [], depthNear: 0.1 };
+  }
+}
+
+function fakeXr({ features = ["local", "viewer", "dom-overlay", "anchors"] } = {}) {
+  const xr = new FakeXrSession();
+  xr.enabledFeatures = features;
   xr.endCalls = 0;
   xr.visibilityState = "visible";
   xr.end = async () => {
@@ -107,10 +115,6 @@ function fakeXr({ failHitTest = false } = {}) {
     xr.dispatchEvent(new Event("end"));
   };
   xr.requestReferenceSpace = async () => ({});
-  xr.requestHitTestSource = async () => {
-    if (failHitTest) throw new Error("brak hit-test");
-    return {};
-  };
   return xr;
 }
 
@@ -184,6 +188,255 @@ test("koniec układania czyści podpowiedź", () => {
   finish(game);
 });
 
+// Plansza postawiona przez sesję W przestrzeni metr przed graczem, który stoi od strony +z: środek całości z elementami
+// na wysokości 1,25 m, plansza pionowo.
+const SPOT = { position: { x: 0, y: 1.25, z: -1 }, yaw: 0 };
+function standingBoard(meters = 1.2) {
+  const session = new XrSession(new FakeElement(), fakeRenderer());
+  const board = session.placeBoard(meters, SPOT);
+  session.scene.updateMatrixWorld(true);
+  return { session, board };
+}
+const toWorld = (object, x, y, z) => object.localToWorld(new Vector3(x, y, z));
+const direction = (object, x, y, z) => toWorld(object, x, y, z).sub(toWorld(object, 0, 0, 0)).normalize();
+const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
+
+// Telefon w klatce WebXR: pozycja, obrót kamery (yaw wokół pionu, pitch w górę i w dół) i kąt widzenia w poziomie.
+function viewerPose(eye, { yaw = 0, pitch = 0, tanHalf = 0.5, emulated = false } = {}) {
+  const q = new Quaternion().setFromEuler(new Euler(pitch, yaw, 0, "YXZ"));
+  const projectionMatrix = [1 / tanHalf, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, -1, 0, 0, -0.02, 0];
+  return { emulatedPosition: emulated, transform: { position: eye, orientation: { x: q.x, y: q.y, z: q.z, w: q.w } }, views: [{ projectionMatrix }] };
+}
+const xrFrame = (pose, extra = {}) => ({ getViewerPose: () => pose, ...extra });
+
+async function startedXr() {
+  const renderer = fakeRenderer();
+  xrApi.requestSession = async () => fakeXr();
+  const session = new XrSession(new FakeElement(), renderer);
+  await session.start();
+  return { session, renderer };
+}
+
+test("w trybie W przestrzeni plansza wisi pionowo przodem do gracza, ze środkiem całości w wybranym miejscu", () => {
+  const { board } = standingBoard(1.2);
+  const pivot = toWorld(board, 0.5, 0, UPRIGHT_PIVOT);
+  const top = toWorld(board, 0.5, 0, 0);
+  assert.ok(near(pivot.x, 0) && near(pivot.y, 1.25) && near(pivot.z, -1), "środek całości w wybranym miejscu");
+  assert.ok(near(top.y, 1.25 + UPRIGHT_PIVOT * 1.2) && near(top.z, -1), "plansza nad nim, pionowo");
+  assert.ok(near(direction(board, 0, 1, 0).z, 1), "przód planszy patrzy na gracza");
+});
+
+test("plansza postawiona poniżej telefonu odchyla się do niego jak pulpit", async () => {
+  const { session, renderer } = await startedXr();
+  const eye = { x: 0, y: 1.25 + 1, z: 0 }; // telefon metr nad środkiem planszy i metr przed nią: 45° w dół
+  session.placeBoard(0.5, { position: { x: 0, y: 1.25, z: -1 }, yaw: 0, tilt: Math.PI / 4 });
+  session.scene.updateMatrixWorld(true);
+  const toEye = new Vector3(0, 1, 1).normalize();
+  assert.ok(direction(session.board, 0, 1, 0).dot(toEye) > 0.999, "przód planszy na wprost telefonu");
+  for (let t = 0; t <= 3000; t += 50) renderer.loop(t, xrFrame(viewerPose(eye, { pitch: -Math.PI / 4 })));
+  session.scene.updateMatrixWorld(true);
+  assert.ok(direction(session.board, 0, 1, 0).dot(toEye) > 0.999, "zostaje zwrócona do telefonu");
+  const pivot = toWorld(session.board, 0.5, 0, UPRIGHT_PIVOT);
+  assert.ok(near(pivot.y, 1.25) && near(pivot.z, -1), "obraca się wokół środka całości");
+});
+
+test("gdy gracz kuca albo wstaje, plansza płynnie odchyla się do telefonu", async () => {
+  const { session, renderer } = await startedXr();
+  session.placeBoard(0.5, { position: { x: 0, y: 1.25, z: -1 }, yaw: 0, tilt: Math.PI / 2 });
+  const eye = { x: 0, y: 2.25, z: 0 }; // telefon nagle metr wyżej
+  renderer.loop(0, xrFrame(viewerPose(eye)));
+  renderer.loop(50, xrFrame(viewerPose(eye)));
+  assert.ok(session.tilt < Math.PI / 2 && session.tilt > Math.PI / 2 - 0.3, `płynnie, nie skokowo (${session.tilt})`);
+  for (let t = 100; t <= 3000; t += 50) renderer.loop(t, xrFrame(viewerPose(eye)));
+  assert.ok(near(session.tilt, Math.PI / 4, 0.01), `po chwili prostopadle do telefonu (${session.tilt})`);
+});
+
+test("na pionowej planszy palec trafia tam, gdzie celuje", () => {
+  const { game } = makeGame();
+  game.board = standingBoard(1.2).board;
+  const origin = new Vector3(0.2, 1.4, 0.5);
+  const aim = toWorld(game.board, 0.3, 0, 0.2).sub(origin).normalize();
+  const { origin: o, direction: d } = game.toBoard({ origin, direction: aim });
+  const { x, z } = (() => { const t = -o.y / d.y; return { x: o.x + d.x * t, z: o.z + d.z * t }; })();
+  assert.ok(o.y > 0 && d.y < 0, "gracz stoi przed planszą");
+  assert.ok(near(x, 0.3) && near(z, 0.2));
+});
+
+test("w trybie z kamerą plansza dalej leży płasko w środku sceny", () => {
+  const session = new CameraSession(new FakeElement(), fakeRenderer());
+  session.surface = { position: new Vector3(0.5, 0, BOARD_H / 2), yaw: 0 };
+  const board = session.placeBoard();
+  session.scene.updateMatrixWorld(true);
+  assert.ok(near(direction(board, 0, 1, 0).y, 1));
+  assert.ok(toWorld(board, 0, 0, 0).length() < 1e-9, "stały widok zakłada początek planszy w środku sceny");
+});
+
+test("na pionowej planszy obraz wysuwa się do gracza i rośnie, zamiast wstawać", () => {
+  const { game } = makeGame();
+  const { board } = standingBoard(1.2);
+  const frame = new Frame({ parent: board, animator: game.animator, image: new Image(), upright: true });
+  const picture = frame.group.children.at(-1);
+  const centerOnBoard = () => board.worldToLocal(picture.getWorldPosition(new Vector3()));
+  frame.applyPose(0);
+  const lying = centerOnBoard();
+  frame.applyPose(1);
+  const standing = centerOnBoard();
+  assert.ok(near(lying.x, 0.5) && near(lying.z, BOARD_H / 2), "leżąc, obraz pokrywa planszę");
+  assert.ok(near(standing.x, 0.5) && near(standing.z, BOARD_H / 2), "wysunięty obraz zostaje na wprost planszy");
+  assert.ok(standing.y > lying.y + 0.1, "obraz wysuwa się w stronę gracza");
+  assert.equal(frame.group.scale.x, FRAME_SCALE);
+  assert.ok(near(direction(picture, 0, 0, 1).z, 1, 1e-6), "obraz patrzy na gracza");
+});
+
+// Telefon w pionie widzi w poziomie tylko około 33°, więc elementy po bokach odsuwały planszę za daleko.
+test("na wiszącej planszy elementy leżą w siatce pod nią, nie po bokach", () => {
+  const { game } = gameInProgress();
+  game.session.upright = true;
+  game.buildPuzzle();
+  for (const piece of game.pieces) {
+    assert.ok(piece.home.z > BOARD_H, "pod planszą");
+    assert.ok(Math.abs(piece.home.x - 0.5) < 0.5, "nie wystaje w bok poza planszę");
+  }
+  finish(game);
+});
+
+test("sesja podaje, skąd i dokąd patrzy telefon", async () => {
+  const { session, renderer } = await startedXr();
+  renderer.loop(0, xrFrame(viewerPose({ x: 0, y: 1.4, z: 0 }, { yaw: Math.PI / 2, tanHalf: 0.4 })));
+  const { eye, forward, tanHalfFov, tanHalfFovY } = session.view;
+  assert.deepEqual([eye.x, eye.y, eye.z], [0, 1.4, 0]);
+  assert.ok(near(forward.x, -1) && near(forward.z, 0), "obrócony o 90° w lewo telefon patrzy w stronę -x");
+  assert.ok(near(tanHalfFov, 0.4) && near(tanHalfFovY, 1));
+});
+
+// Na słabszych telefonach ARCore długo szuka podłogi albo jej nie znajduje (OnePlus Nord 4, 9.11.2026).
+test("obrys wisi przed telefonem i idzie za nim, bez szukania podłogi", async () => {
+  const { game, renderer } = makeGame();
+  xrApi.requestSession = async () => fakeXr();
+  await game.start("lis", "latwy");
+  game.selectSize("mala");
+  const eye = { x: 0, y: 1.4, z: 0 };
+  renderer.loop(0, xrFrame(viewerPose(eye)));
+  const spot = aimSpot(eye, { x: 0, y: 0, z: -1 }, BOARD_METERS.mala, 0.5, 1);
+  assert.ok(game.outline.visible);
+  assert.ok(near(game.outline.position.y, spot.position.y) && near(game.outline.position.z, spot.position.z), "obrys tam, gdzie stanie plansza");
+  assert.ok(near(game.outline.userData.stand.rotation.x, spot.tilt), "obrys nachylony tak jak plansza");
+  renderer.loop(50, xrFrame(viewerPose(eye, { yaw: Math.PI / 2 })));
+  assert.ok(near(game.outline.position.x, spot.position.z) && near(game.outline.position.z, 0), "obrys idzie za telefonem");
+  finish(game);
+});
+
+test("dotknięcie ekranu zostawia planszę tam, gdzie wisi obrys", async () => {
+  const { game, renderer } = makeGame();
+  xrApi.requestSession = async () => fakeXr();
+  await game.start("lis", "latwy");
+  renderer.loop(0, xrFrame(viewerPose({ x: 0.3, y: 1.4, z: 0.2 }, { yaw: 0.4 })));
+  const at = game.outline.position.clone();
+  game.pointer("down", { origin: new Vector3(), direction: new Vector3(0, 0, -1) }, 1);
+  assert.equal(game.phase, "intro");
+  assert.ok(game.session.placement.position.distanceTo(at) < 1e-9);
+  finish(game);
+});
+
+test("bez śledzenia ruchu telefonu nie da się postawić planszy", async () => {
+  const { game, renderer } = makeGame();
+  xrApi.requestSession = async () => fakeXr();
+  await game.start("lis", "latwy");
+  renderer.loop(0, xrFrame(viewerPose({ x: 0, y: 1.4, z: 0 }, { emulated: true })));
+  renderer.loop(4000, xrFrame(viewerPose({ x: 0, y: 1.4, z: 0 }, { emulated: true })));
+  assert.equal(game.outline.visible, false);
+  game.pointer("down", { origin: new Vector3(), direction: new Vector3(0, 0, -1) }, 1);
+  assert.equal(game.phase, "placing");
+  assert.match(game.el.hint.textContent, /porusz/i);
+  finish(game);
+});
+
+test("telefon skierowany prosto w dół nie ustawia planszy pod nogami", async () => {
+  const { game, renderer } = makeGame();
+  xrApi.requestSession = async () => fakeXr();
+  await game.start("lis", "latwy");
+  const down = xrFrame(viewerPose({ x: 0, y: 1.4, z: 0 }, { pitch: -Math.PI / 2 }));
+  renderer.loop(0, down);
+  renderer.loop(4000, down);
+  assert.equal(game.outline.visible, false);
+  assert.match(game.el.hint.textContent, /przed siebie/);
+  finish(game);
+});
+
+test("postawiona plansza przypina się kotwicą ARCore w tym miejscu", async () => {
+  globalThis.XRRigidTransform = class {
+    constructor(position) {
+      this.position = position;
+    }
+  };
+  try {
+    const { session, renderer } = await startedXr();
+    const anchor = { anchorSpace: {}, delete() {} };
+    let asked = null;
+    const frame = xrFrame(viewerPose({ x: 0, y: 1.4, z: 0 }), {
+      createAnchor: async (transform) => ((asked = transform.position), anchor),
+      trackedAnchors: new Set([anchor]),
+      getPose: () => ({ transform: { position: { x: 0.1, y: 1.3, z: -1 } } }), // ARCore poprawia położenie
+    });
+    session.placeBoard(1.2, SPOT);
+    renderer.loop(0, frame);
+    await tick();
+    assert.deepEqual({ ...asked }, { x: 0, y: 1.25, z: -1 });
+    renderer.loop(50, frame);
+    assert.deepEqual(session.placement.position.toArray(), [0.1, 1.3, -1]);
+  } finally {
+    delete globalThis.XRRigidTransform;
+  }
+});
+
+// Z boku widać tylko krawędź stojącej planszy (OnePlus Nord 4, 9.11.2026: 75° obok gracza po przejściu w bok).
+test("stojąca plansza płynnie obraca się przodem do gracza, gdy ten przejdzie w bok", async () => {
+  const { session, renderer } = await startedXr();
+  session.placeBoard(1.2, { position: { x: 0, y: 1.25, z: -2 }, yaw: 0 });
+  renderer.loop(0, xrFrame(viewerPose({ x: 0, y: 1.4, z: 0 })));
+  assert.ok(near(session.placement.rotation.y, 0), "po postawieniu plansza patrzy na gracza");
+  const side = viewerPose({ x: 2, y: 1.4, z: -2 }, { yaw: Math.PI / 2 }); // gracz stoi teraz z prawej strony planszy
+  renderer.loop(50, xrFrame(side));
+  const early = session.placement.rotation.y;
+  assert.ok(early > 0 && early < Math.PI / 4, `obrót jest płynny, nie skokowy (${early})`);
+  for (let t = 100; t <= 3000; t += 50) renderer.loop(t, xrFrame(side));
+  assert.ok(near(session.placement.rotation.y, Math.PI / 2, 0.01), "po chwili plansza patrzy na gracza");
+});
+
+test("obrót do gracza idzie krótszą drogą przez tył planszy", async () => {
+  const { session, renderer } = await startedXr();
+  session.placeBoard(1.2, { position: { x: 0, y: 1.25, z: 0 }, yaw: Math.PI - 0.1 });
+  const behind = viewerPose({ x: Math.sin(-Math.PI + 0.1), y: 1.4, z: Math.cos(-Math.PI + 0.1) }); // 0,2 rad dalej, za ±180°
+  for (let t = 0; t <= 3000; t += 50) renderer.loop(t, xrFrame(behind));
+  const yaw = session.placement.rotation.y;
+  assert.ok(near(Math.cos(yaw), Math.cos(-Math.PI + 0.1), 1e-3) && near(Math.sin(yaw), Math.sin(-Math.PI + 0.1), 1e-3));
+});
+
+// Chrome 143 nie pokazuje obrazu z XRProjectionLayer w sesji bez funkcji "layers" (OnePlus Nord 4, 9.11.2026).
+test("bez funkcji layers Three.js rysuje przez XRWebGLLayer", async () => {
+  const renderer = fakeRenderer();
+  let layersSeen = "nie sprawdzono";
+  renderer.xr.setSession = async (session) => {
+    layersSeen = session.renderState.layers;
+  };
+  const xr = fakeXr();
+  xrApi.requestSession = async () => xr;
+  await new XrSession(new FakeElement(), renderer).start();
+  assert.equal(layersSeen, undefined);
+  assert.deepEqual(xr.renderState.layers, [], "po starcie sesja pokazuje prawdziwy stan");
+});
+
+test("z funkcją layers Three.js może użyć XRProjectionLayer", async () => {
+  const renderer = fakeRenderer();
+  let layersSeen = "nie sprawdzono";
+  renderer.xr.setSession = async (session) => {
+    layersSeen = session.renderState.layers;
+  };
+  xrApi.requestSession = async () => fakeXr({ features: ["local", "viewer", "hit-test", "dom-overlay", "layers"] });
+  await new XrSession(new FakeElement(), renderer).start();
+  assert.deepEqual(layersSeen, []);
+});
+
 test("błąd w jednej klatce nie zatrzymuje pętli AR", async () => {
   const renderer = fakeRenderer();
   const xr = fakeXr();
@@ -221,9 +474,12 @@ test("wyjście w czasie startu AR kończy sesję, gdy przeglądarka ją odda", a
 });
 
 test("błąd po przyznaniu sesji kończy ją i wraca do menu", async () => {
-  const xr = fakeXr({ failHitTest: true });
+  const xr = fakeXr();
   xrApi.requestSession = async () => xr;
   const { game, log, renderer } = makeGame();
+  renderer.xr.setSession = async () => {
+    throw new Error("brak WebGL");
+  };
   const warn = console.warn;
   console.warn = () => {};
   await game.start("lis", "latwy");

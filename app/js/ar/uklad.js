@@ -1,8 +1,9 @@
 // Logika planszy w trybie AR, bez Three.js i bez DOM.
 // Jednostki planszy: szerokość 1, wysokość 9/16, początek w lewym dalszym rogu, oś x w prawo, oś z do gracza.
-// Na metry przelicza to skala grupy z planszą.
+// Na metry przelicza to skala grupy z planszą. W trybie W przestrzeni plansza wisi przed graczem, zwrócona do niego
+// (boardPose, aimSpot): oś z idzie wtedy mniej więcej w dół, a oś y do gracza, więc „przed planszą” znaczy „pod nią”.
 
-export const BOARD_METERS = { stol: 0.5, podloga: 1.2 };
+export const BOARD_METERS = { mala: 0.5, duza: 0.8 };
 export const BOARD_H = 9 / 16;
 export const FRAME_SCALE = 1.5; // ile razy rama jest szersza od planszy
 export const THICKNESS = 0.012; // grubość elementu
@@ -15,8 +16,14 @@ export const TILT = (9 * Math.PI) / 180; // największy obrót rozsypanego eleme
 
 const PITCH = 1.05; // odstęp między rozsypanymi elementami względem wielkości komórki
 const NEAR_FACTOR = 1.6; // w jakim promieniu świeci miejsce, jak markNear w puzzle.js
-const MIN_DOWN = 0.05; // promień prawie równoległy do podłogi trafiłby bardzo daleko, więc go pomijamy
+const AIM_ROOM = 1.1; // zapas wokół planszy z elementami w kadrze
+const AIM_MIN_LEVEL = 0.2; // telefon skierowany prawie pionowo: kierunek w poziomie byłby przypadkowy
+const MIN_DOWN = 0.05; // promień prawie równoległy do planszy trafiłby bardzo daleko, więc go pomijamy
 const FRONT_PITCH = 1.08; // odstęp elementów w siatce pod planszą względem wielkości komórki
+// Dolna krawędź siatki elementów pod planszą (planFrontHomes), z zapasem na każdy poziom: rows * ch = BOARD_H.
+const FRONT_BOTTOM = BOARD_H * (1 + FRONT_PITCH) + HOME_MARGIN;
+// Punkt, wokół którego wisząca plansza obraca się do telefonu: środek całości z elementami pod planszą.
+export const UPRIGHT_PIVOT = FRONT_BOTTOM / 2;
 const FIXED_FOV = 50;
 const FIXED_TILT = (20 * Math.PI) / 180; // odchylenie od pionu: plansza wygląda, jakby leżała przed graczem
 // Wymiary widoku z zapasem na perspektywę, górny pasek i podpowiedź; z to środek widoku na planszy.
@@ -119,6 +126,33 @@ export function pickPiece(pieces, point, level) {
 
 export function clampToArea({ x, z }) {
   return { x: clamp(x, -DRAG_MARGIN, 1 + DRAG_MARGIN), z: clamp(z, -DRAG_MARGIN, BOARD_H + DRAG_MARGIN) };
+}
+
+// Położenie planszy względem wybranego punktu, w jednostkach planszy. `tilt` to obrót wokół osi x: 0 to plansza leżąca,
+// π/2 stojąca pionowo przodem do gracza, a pomiędzy odchylona do tyłu jak pulpit. Punkt planszy (0,5; 0; pivotZ)
+// zostaje w wybranym miejscu przy każdym nachyleniu; `lift` i `back` to przesunięcie obracanej grupy.
+export function boardPose(tilt, pivotZ) {
+  return { tilt, lift: pivotZ * Math.sin(tilt), back: -pivotZ * Math.cos(tilt), offset: { x: -0.5, z: 0 } };
+}
+
+// Nachylenie, przy którym przód planszy w `position` patrzy prosto na telefon w `eye`.
+export function facingTilt(eye, position) {
+  return Math.PI / 2 - Math.atan2(eye.y - position.y, Math.hypot(eye.x - position.x, eye.z - position.z));
+}
+
+// Miejsce wiszącej planszy przed telefonem: `eye` to pozycja telefonu, `forward` kierunek kamery, `meters` szerokość
+// planszy, a `tanHalfFov` i `tanHalfFovY` to tangensy połowy kąta widzenia w poziomie i w pionie. Elementy leżą
+// w siatce pod planszą (planFrontHomes), bo telefon w pionie widzi w poziomie tylko około 33°: z elementami po bokach
+// plansza wisiałaby kilka metrów dalej. Środek całości (UPRIGHT_PIVOT) jest tam, gdzie celuje telefon, tak blisko,
+// jak pozwala kadr, a plansza jest prostopadle do linii celowania. Zwraca null, gdy telefon patrzy prawie pionowo.
+export function aimSpot(eye, forward, meters, tanHalfFov, tanHalfFovY = Infinity) {
+  const length = Math.hypot(forward.x, forward.y, forward.z);
+  if (Math.hypot(forward.x, forward.z) < AIM_MIN_LEVEL * length) return null;
+  const halfWidth = (FRONT_PITCH / 2) * meters;
+  const halfHeight = (FRONT_BOTTOM / 2) * meters;
+  const k = (AIM_ROOM * Math.max(halfWidth / tanHalfFov, halfHeight / tanHalfFovY)) / length;
+  const position = { x: eye.x + forward.x * k, y: eye.y + forward.y * k, z: eye.z + forward.z * k };
+  return { position, yaw: Math.atan2(eye.x - position.x, eye.z - position.z), tilt: facingTilt(eye, position) };
 }
 
 function distanceToTarget(piece, point, level) {

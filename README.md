@@ -2,11 +2,11 @@
 
 Gra o zwierzętach polskich lasów: ułóż obrazek, a zwierzę ożyje. Czysty HTML, CSS i JavaScript, bez instalowania zależności i bez kroku budowania.
 
-Gra działa pod adresem: https://raftum92.github.io/lesne-puzzle-QR-webXR-/app/
+Gra działa pod adresem: https://pomoceedukacyjne.pl/puzzle/app/. Wersja z gałęzi `main` jest też na GitHub Pages: https://raftum92.github.io/lesne-puzzle-QR-webXR-/app/
 
 ## Kody QR: z monitora na telefon
 
-Gra jest pomyślana jako stanowisko w Centrum Nauki Experyment: zwiedzający układają obrazki głównie na monitorze, a telefon jest dodatkiem. Tryb „W przestrzeni” (WebXR) kładzie układankę na prawdziwej podłodze, widzianej przez kamerę telefonu. Monitor tego nie pokaże, więc kod QR przenosi jedno zwierzę na telefon:
+Gra jest pomyślana jako stanowisko w Centrum Nauki Experyment: zwiedzający układają obrazki głównie na monitorze, a telefon jest dodatkiem. Tryb „W przestrzeni” (WebXR) zawiesza pionową układankę w prawdziwym pokoju, widzianym przez kamerę telefonu. Monitor tego nie pokaże, więc kod QR przenosi jedno zwierzę na telefon:
 
 1. Na monitorze zwiedzający wybiera poziom i zwierzę, na przykład lisa. Otwiera się okno z dużym obrazkiem i przyciskiem „Ułóż na ekranie” (domyślny, działa też Enter). Obok jest mniejszy kod QR „Dodatkowo: ułóż w telefonie” z informacją, że najlepiej działa na Androidzie w Chrome, na telefonie z ARCore, a na innych telefonach, także na iPhonie, układa się na tle obrazu z kamery.
 2. Zwiedzający skanuje kod aparatem telefonu. Kod zawiera adres gry z wybranym zwierzęciem i poziomem, na przykład `app/?zwierze=lis&poziom=latwy`.
@@ -19,9 +19,9 @@ Z podglądu bez HTTPS, na przykład z `localhost`, kod prowadzi na opublikowaną
 
 ## Tryb „W przestrzeni” i tryb „Z kamerą”
 
-Tryb „W przestrzeni” (WebXR) działa tylko na telefonach z Androidem, Chrome i ARCore. Nie każdy Android ma ARCore: na przykład Moto G13 go nie ma, a pełna lista jest na https://developers.google.com/ar/devices. iPhone'y w ogóle nie obsługują WebXR.
+Tryb „W przestrzeni” (WebXR) działa tylko na telefonach z Androidem, Chrome i ARCore. Plansza wisi w nim przodem do gracza, jak na sztaludze albo pulpicie, a elementy leżą pod nią w siatce. Leżącą planszę widać z telefonu pod zbyt ostrym kątem. Gra nie szuka podłogi, bo na słabszych telefonach ARCore długo jej nie znajduje albo gubi ją co chwilę: obrys planszy wisi tam, gdzie celuje telefon, i idzie za nim, a dotknięcie ekranu zostawia planszę w tym miejscu, przypiętą kotwicą ARCore (`aimSpot` w `app/js/ar/uklad.js`). Telefon w pionie widzi w poziomie tylko około 33°, więc elementy nie leżą po bokach planszy, bo wtedy wisiałaby kilka metrów dalej. Mała plansza (50 cm) wisi około 1 m od gracza, a duża (80 cm) około 1,5 m, tak żeby razem z elementami mieściła się w kadrze. Odległość wynika z kąta widzenia aparatu, więc na innych telefonach może być trochę inna. Gdy gracz chodzi, kuca albo wstaje, a także gdy ARCore przesunie kotwicę, plansza płynnie obraca się przodem do telefonu: w bok i, gdy wisi niżej niż telefon, do tyłu jak pulpit. Z boku albo z góry widać by ją pod zbyt ostrym kątem. Po ułożeniu obraz nie wstaje, tylko wysuwa się z planszy i rośnie. Three.js rysuje tu przez XRWebGLLayer, nie przez XRProjectionLayer: Chrome 143 na Androidzie ma pole `renderState.layers` także bez funkcji „layers”, ale obrazu z tej warstwy nie widać (`setSessionWithoutLayers` w `app/js/ar/sesja.js`). Nie każdy Android ma ARCore: na przykład Moto G13 go nie ma, a pełna lista jest na https://developers.google.com/ar/devices. iPhone'y w ogóle nie obsługują WebXR.
 
-Pozostałe telefony i tablety z kamerą dostają tryb „Z kamerą” (`CameraSession` w `app/js/ar/sesja.js`). Obraz z tylnej kamery leży pod przezroczystą sceną 3D, plansza ma stałe miejsce na ekranie, a elementy leżą pod nią w siatce, gdy ekran jest pionowy. Gdy obraz wstaje, widok sam przechodzi przed ramę, a zwierzę wyskakuje z niej tak samo jak w trybie „W przestrzeni”. Plansza nie leży na prawdziwej podłodze i nie da się jej obejść, bo bez ARCore przeglądarka nie widzi powierzchni. Kamera gaśnie od razu po wyjściu z gry.
+Pozostałe telefony i tablety z kamerą dostają tryb „Z kamerą” (`CameraSession` w `app/js/ar/sesja.js`). Obraz z tylnej kamery leży pod przezroczystą sceną 3D, plansza ma stałe miejsce na ekranie, a elementy leżą pod nią w siatce, gdy ekran jest pionowy. Gdy obraz wstaje, widok sam przechodzi przed ramę, a zwierzę wyskakuje z niej tak samo jak w trybie „W przestrzeni”. Plansza leży tu płasko, nie stoi na prawdziwej podłodze i nie da się jej obejść, bo bez ARCore przeglądarka nie widzi powierzchni. Kamera gaśnie od razu po wyjściu z gry.
 
 Chrome potrafi zgłosić AR także na telefonie bez ARCore i odmówić dopiero przy starcie sesji, różnymi błędami, zależnie od tego, co gracz zrobi z prośbą o instalację ARCore. Dlatego po każdym nieudanym starcie trybu „W przestrzeni” gra od razu, bez pytania, przechodzi na tryb „Z kamerą”, a przełącznik w menu zmienia nazwę do końca wizyty na stronie. Przy następnym otwarciu strony gra znów najpierw próbuje trybu „W przestrzeni”, bo powodem mógł być na przykład brak zainstalowanego ARCore.
 
@@ -30,6 +30,12 @@ Gdy nie ruszy też kamera, okno z błędem kończy się kodem, np. „Kod błęd
 Monitor z kamerką, także dotykowy, nie dostaje tego trybu, tylko okno z kodem QR. Telefon bez kamery, bez zgody na nią albo bez HTTPS gra na ekranie.
 
 Sprawdzone na prawdziwych telefonach 7 listopada 2026: telefon z ARCore gra w trybie „W przestrzeni”, a Moto G13 (bez ARCore) w trybie „Z kamerą”, po zeskanowaniu kodu QR z monitora. Na iPhonie tryb „Z kamerą” nie był jeszcze sprawdzany.
+
+## Serwer: pomoceedukacyjne.pl
+
+Kody QR prowadzą na https://pomoceedukacyjne.pl/puzzle/app/ (`PUBLIC_URL` w `app/js/telefon.js`). Gra leży tam w folderze `httpdocs/puzzle/` na serwerze Plesk w artnet (`v46197.artnet.gda.pl`, 178.255.46.197), obok strony głównej domeny. DNS i https daje Cloudflare: domena główna i `www` idą przez jego proxy, a poczta i FTP prosto na serwer.
+
+Nową wersję wgrywa się przez FTPS (FTP z TLS, port 21): pliki `index.html`, `app/` i `assets/` z repozytorium do `httpdocs/puzzle/`. Serwer ProFTPD zrywa część przesyłań przy TLS 1.3 (kod 426), więc `curl` dostaje `--tls-max 1.2`. Po wgraniu trzeba wyczyścić pamięć podręczną w Cloudflare (Caching → Purge Everything), bo inaczej telefony mogą dostać stare pliki.
 
 ## Serwer: GitHub Pages
 

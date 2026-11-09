@@ -3,7 +3,7 @@ import { ANIMALS } from "./zwierzeta.js";
 import { LEVELS } from "./poziomy.js";
 
 // Opublikowana gra. Tam prowadzi kod QR z podglądu bez HTTPS: telefon nie otworzy cudzego `localhost`, a WebXR wymaga HTTPS.
-export const PUBLIC_URL = "https://raftum92.github.io/lesne-puzzle-QR-webXR-/app/";
+export const PUBLIC_URL = "https://pomoceedukacyjne.pl/puzzle/app/";
 
 export function phoneLink(animalId, levelId, { protocol, origin, pathname }) {
   const base = protocol === "https:" ? origin + pathname : PUBLIC_URL;

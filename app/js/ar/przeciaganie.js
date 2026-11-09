@@ -36,7 +36,7 @@ export class Dragger {
 
   move(ray) {
     const point = this.point(ray);
-    if (!point) return; // promień prawie równoległy do podłogi: element czeka na miejscu
+    if (!point) return; // promień prawie równoległy do planszy: element czeka na miejscu
     const { piece, dx, dz } = this.drag;
     Object.assign(piece, clampToArea({ x: point.x + dx, z: point.z + dz }, this.bottom));
     this.onMove(piece);

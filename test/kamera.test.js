@@ -92,7 +92,7 @@ test("obraz z kamery leży pod płótnem, a plansza ma od razu swoje miejsce", a
   assert.equal(renderer.xr.enabled, false);
   assert.ok(session.fixedView && session.surface);
   assert.equal(session.frontHomes, true, "pionowy ekran: elementy pod planszą");
-  assert.equal(session.placeBoard(1.2).parent.scale.x, 1, "rozmiar planszy nie zależy od wybranego stołu albo podłogi");
+  assert.equal(session.placeBoard(1.2).parent.scale.x, 1, "rozmiar planszy nie zależy od wybranej małej albo dużej");
   session.stop();
 });
 

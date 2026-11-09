@@ -1,9 +1,9 @@
 // Logika planszy w trybie AR, bez Three.js i bez DOM.
 // Jednostki planszy: szerokość 1, wysokość 9/16, początek w lewym dalszym rogu, oś x w prawo, oś z do gracza.
-// Na metry przelicza to skala grupy z planszą. W trybie W przestrzeni plansza stoi pionowo (boardPose): oś z idzie
-// wtedy w dół, a oś y do gracza, więc „przed planszą” znaczy „pod nią”.
+// Na metry przelicza to skala grupy z planszą. W trybie W przestrzeni plansza wisi pionowo przed graczem (boardPose,
+// aimSpot): oś z idzie wtedy w dół, a oś y do gracza, więc „przed planszą” znaczy „pod nią”.
 
-export const BOARD_METERS = { stol: 0.5, podloga: 1.2 };
+export const BOARD_METERS = { mala: 0.5, duza: 1.2 };
 export const BOARD_H = 9 / 16;
 export const FRAME_SCALE = 1.5; // ile razy rama jest szersza od planszy
 export const THICKNESS = 0.012; // grubość elementu
@@ -13,13 +13,13 @@ export const DRAG_MARGIN = 0.7; // jak daleko poza planszę można wynieść ele
 export const HOME_MARGIN = 0.04; // odstęp rozsypanych elementów od planszy
 export const HOME_SPREAD = 0.45; // szerokość pasa, w którym leżą rozsypane elementy
 export const TILT = (9 * Math.PI) / 180; // największy obrót rozsypanego elementu, jak w puzzle.js
-// Wysokość górnego brzegu stojącej planszy nad powierzchnią: elementy rozsypane pod planszą, z wypustkami
-// i obrotem, mieszczą się nad podłogą. Przy podłodze to około 1,4 m, przy stole około 58 cm nad blatem.
-export const UPRIGHT_TOP = BOARD_H + HOME_MARGIN + HOME_SPREAD + 0.1;
 
 const PITCH = 1.05; // odstęp między rozsypanymi elementami względem wielkości komórki
 const NEAR_FACTOR = 1.6; // w jakim promieniu świeci miejsce, jak markNear w puzzle.js
-const MIN_DOWN = 0.05; // promień prawie równoległy do podłogi trafiłby bardzo daleko, więc go pomijamy
+const AIM_DROP = 0.15; // o tyle metrów środek wiszącej planszy jest niżej niż telefon: wygodniej patrzeć lekko w dół
+const AIM_ROOM = 1.1; // zapas wokół planszy z elementami w kadrze
+const AIM_MIN_LEVEL = 0.2; // telefon skierowany prawie pionowo: kierunek w poziomie byłby przypadkowy
+const MIN_DOWN = 0.05; // promień prawie równoległy do planszy trafiłby bardzo daleko, więc go pomijamy
 const FRONT_PITCH = 1.08; // odstęp elementów w siatce pod planszą względem wielkości komórki
 const FIXED_FOV = 50;
 const FIXED_TILT = (20 * Math.PI) / 180; // odchylenie od pionu: plansza wygląda, jakby leżała przed graczem
@@ -121,7 +121,7 @@ export function pickPiece(pieces, point, level) {
   return best;
 }
 
-// `bottom` to największe z: na stojącej planszy niżej element wszedłby w podłogę.
+// `bottom` to największe z: na stojącej planszy element nie zejdzie niżej niż rozsypane.
 export function clampToArea({ x, z }, bottom = BOARD_H + DRAG_MARGIN) {
   return { x: clamp(x, -DRAG_MARGIN, 1 + DRAG_MARGIN), z: clamp(z, -DRAG_MARGIN, bottom) };
 }
@@ -131,13 +131,26 @@ export function uprightBottom(level) {
   return BOARD_H + HOME_MARGIN + HOME_SPREAD - cellSize(level).ch / 2;
 }
 
-// Położenie planszy względem punktu na powierzchni, w jednostkach planszy: obrót wokół osi x, wysokość obrotu
-// i przesunięcie samej planszy. Leżąca ma środek w tym punkcie; stojąca ma górny brzeg UPRIGHT_TOP nad nim
-// i przód zwrócony do gracza.
+// Położenie planszy względem wybranego punktu, w jednostkach planszy: obrót wokół osi x, wysokość obrotu
+// i przesunięcie samej planszy. Obie mają środek w tym punkcie; stojąca ma przód zwrócony do gracza.
 export function boardPose(upright) {
   return upright
-    ? { tilt: Math.PI / 2, lift: UPRIGHT_TOP, offset: { x: -0.5, z: 0 } }
+    ? { tilt: Math.PI / 2, lift: BOARD_H / 2, offset: { x: -0.5, z: 0 } }
     : { tilt: 0, lift: 0, offset: { x: -0.5, z: -BOARD_H / 2 } };
+}
+
+// Miejsce wiszącej planszy przed telefonem: `eye` to pozycja telefonu, `forward` kierunek kamery, `meters` szerokość
+// planszy, a `tanHalfFov` tangens połowy kąta widzenia w poziomie. Plansza jest na wprost, tak daleko, żeby razem
+// z elementami po bokach mieściła się w kadrze, i przodem do telefonu. Zwraca null, gdy telefon patrzy prawie
+// pionowo w dół albo w górę.
+export function aimSpot(eye, forward, meters, tanHalfFov) {
+  const level = Math.hypot(forward.x, forward.z);
+  if (level < AIM_MIN_LEVEL * Math.hypot(forward.x, forward.y, forward.z)) return null;
+  const halfArea = (1 / 2 + HOME_MARGIN + HOME_SPREAD) * meters;
+  const distance = (halfArea * AIM_ROOM) / tanHalfFov;
+  const x = eye.x + (forward.x / level) * distance;
+  const z = eye.z + (forward.z / level) * distance;
+  return { position: { x, y: eye.y - AIM_DROP, z }, yaw: Math.atan2(eye.x - x, eye.z - z) };
 }
 
 function distanceToTarget(piece, point, level) {

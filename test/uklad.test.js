@@ -12,7 +12,7 @@ import {
   HOME_MARGIN,
   HOME_SPREAD,
   TILT,
-  UPRIGHT_TOP,
+  aimSpot,
   boardPose,
   uprightBottom,
   cellSize,
@@ -30,7 +30,7 @@ import {
 const H = 9 / 16;
 
 test("stałe mają wartości ze specyfikacji", () => {
-  assert.deepEqual(BOARD_METERS, { stol: 0.5, podloga: 1.2 });
+  assert.deepEqual(BOARD_METERS, { mala: 0.5, duza: 1.2 });
   assert.equal(BOARD_H, H);
   assert.equal(FRAME_SCALE, 1.5);
   assert.equal(THICKNESS, 0.012);
@@ -189,34 +189,41 @@ test("clampToArea zatrzymuje punkt na granicy obszaru", () => {
   assert.deepEqual(clampToArea({ x: 0.5, z: 0.2 }), { x: 0.5, z: 0.2 });
 });
 
-// Najniższy punkt elementu o środku w z: pół komórki, wypustka (do 0,25 krótszego boku) i obrót o TILT.
-function lowestPoint(z, level) {
-  const { cw, ch, size } = cellSize(level);
-  return z + (ch / 2 + 0.25 * size) * Math.cos(TILT) + (cw / 2) * Math.sin(TILT);
-}
-
-test("pionowa plansza stoi tak wysoko, że rozsypane pod nią elementy nie wchodzą w podłogę", () => {
-  for (const level of Object.values(LEVELS)) {
-    for (let seed = 0; seed < 20; seed++) {
-      let s = seed + 1;
-      const random = () => ((s = (s * 16807) % 2147483647) / 2147483647);
-      for (const home of planHomes(level, random)) assert.ok(lowestPoint(home.z, level) <= UPRIGHT_TOP, `${level.id} z=${home.z}`);
-    }
-  }
-});
-
 test("przeciągany element na pionowej planszy nie zejdzie niżej niż rozsypane", () => {
   for (const level of Object.values(LEVELS)) {
     const bottom = uprightBottom(level);
-    assert.ok(lowestPoint(bottom, level) <= UPRIGHT_TOP, level.id);
     assert.ok(Math.max(...planHomes(level).map((home) => home.z)) <= bottom + 1e-9, level.id);
     assert.equal(clampToArea({ x: 0.5, z: 5 }, bottom).z, bottom);
   }
 });
 
-test("boardPose: leżąca ma środek w punkcie powierzchni, stojąca górny brzeg nad nim", () => {
+test("boardPose: obie plansze mają środek w wybranym punkcie, stojąca obraca się do pionu", () => {
   assert.deepEqual(boardPose(false), { tilt: 0, lift: 0, offset: { x: -0.5, z: -H / 2 } });
-  assert.deepEqual(boardPose(true), { tilt: Math.PI / 2, lift: UPRIGHT_TOP, offset: { x: -0.5, z: 0 } });
+  assert.deepEqual(boardPose(true), { tilt: Math.PI / 2, lift: H / 2, offset: { x: -0.5, z: 0 } });
+});
+
+test("aimSpot: plansza wisi przed telefonem, przodem do niego, trochę niżej", () => {
+  const eye = { x: 1, y: 1.5, z: 2 };
+  const spot = aimSpot(eye, { x: 0, y: -0.3, z: -1 }, 1.2, 0.5);
+  const distance = Math.hypot(spot.position.x - eye.x, spot.position.z - eye.z);
+  assert.ok(Math.abs(spot.position.x - eye.x) < 1e-9 && spot.position.z < eye.z, "na wprost, mimo telefonu pochylonego w dół");
+  assert.ok(spot.position.y < eye.y && spot.position.y > eye.y - 0.5, "środek trochę niżej niż telefon");
+  assert.ok(Math.abs(spot.yaw) < 1e-9, "przód planszy do telefonu");
+  const halfArea = (1 + 2 * (HOME_MARGIN + HOME_SPREAD)) / 2;
+  assert.ok(halfArea * 1.2 <= distance * 0.5, "cała plansza z elementami mieści się w kadrze");
+});
+
+test("aimSpot: mała plansza wisi bliżej niż duża, a węższy kadr odsuwa planszę", () => {
+  const eye = { x: 0, y: 1.5, z: 0 };
+  const forward = { x: 0, y: 0, z: -1 };
+  const far = (meters, tan) => -aimSpot(eye, forward, meters, tan).position.z;
+  assert.ok(far(BOARD_METERS.mala, 0.5) < far(BOARD_METERS.duza, 0.5));
+  assert.ok(far(BOARD_METERS.mala, 0.4) > far(BOARD_METERS.mala, 0.5));
+});
+
+test("aimSpot: telefon skierowany prosto w dół albo w górę nie wybiera miejsca", () => {
+  assert.equal(aimSpot({ x: 0, y: 1.5, z: 0 }, { x: 0, y: -1, z: 0.01 }, 1.2, 0.5), null);
+  assert.equal(aimSpot({ x: 0, y: 1.5, z: 0 }, { x: 0.01, y: 1, z: 0 }, 1.2, 0.5), null);
 });
 
 test("intersectBoard: promień w dół trafia, a prawie poziomy nie", () => {

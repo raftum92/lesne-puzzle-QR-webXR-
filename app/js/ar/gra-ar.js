@@ -1,4 +1,4 @@
-// Gra w trybie „W przestrzeni”: od szukania podłogi po informację o zwierzęciu.
+// Gra w trybie „W przestrzeni”: od ustawienia planszy przed sobą po informację o zwierzęciu.
 import * as THREE from "../../vendor/three.module.min.js";
 import { ANIMALS, nextAnimal } from "../zwierzeta.js";
 import { LEVELS, pieceCount, piecesLabel } from "../poziomy.js";
@@ -6,7 +6,7 @@ import { createCuts } from "../ksztalty.js";
 import { renderInfo } from "../info.js";
 import { createSession, poseBoard } from "./sesja.js";
 import { Animator } from "./animacje.js";
-import { BOARD_H, BOARD_METERS, LIFT, planFrontHomes, planHomes, targetOf, uprightBottom } from "./uklad.js";
+import { BOARD_H, BOARD_METERS, LIFT, aimSpot, planFrontHomes, planHomes, targetOf, uprightBottom } from "./uklad.js";
 import { Frame } from "./rama.js";
 import { JUMP_FADE_MS, canJump, jumpDue } from "./skok.js";
 import { Dragger } from "./przeciaganie.js";
@@ -24,12 +24,11 @@ const FILM_START_MS = 750; // film rusza, zanim obraz stanie, jak w gra.js
 const LOWER_MS = 700; // obraz kładzie się z powrotem na planszę
 const PLAY_TIMEOUT_MS = 8000; // przy zerwanej sieci play() może nigdy się nie skończyć, a w tej fazie nie ma przycisków
 const SPACE_HINT_MS = 3000; // tyle widać przypomnienie o wolnym miejscu na początku
-const NO_SURFACE_MS = 15000; // po takim czasie bez podłogi gra podpowiada, co zmienić
 const HINT_SPACE = "Rozejrzyj się, czy masz wolne miejsce, i uważaj na przeszkody";
-const HINT_SEARCH = "Powoli poruszaj telefonem, żeby znaleźć podłogę";
+const HINT_AIM = "Ustaw planszę przed sobą i dotknij ekranu";
+const HINT_LEVEL = "Skieruj telefon przed siebie";
 const HINT_CAMERA = "Zezwól przeglądarce na użycie kamery";
-const HINT_NO_SURFACE = "Skieruj telefon na podłogę z wyraźnym wzorem i dobrym światłem";
-const HINT_TRACKING = "Porusz telefonem, żeby znów zobaczyć podłogę";
+const HINT_TRACKING = "Powoli porusz telefonem, żeby gra znów widziała pokój";
 const HINT_IMAGE = "Nie udało się wczytać obrazka. Sprawdź połączenie i spróbuj ponownie.";
 const PIECE_Y = 0.002; // elementy leżą minimalnie nad planszą
 const STACK_STEP = 0.0003; // każdy upuszczony element leży trochę wyżej, żeby nakładające się nie migotały
@@ -71,7 +70,7 @@ export class ArGame {
     this.busy = false;
     this.timer = { running: false, elapsed: 0, since: null };
     this.stats = { picks: 0 };
-    this.size = "podloga";
+    this.size = "mala"; // mała plansza wisi bliżej, więc łatwiej ją objąć wzrokiem
     this.debug = new URLSearchParams(location.search).get("debug") === "1";
     this.root.dataset.kind = kind;
     this.el.fps.hidden = !this.debug;
@@ -86,7 +85,7 @@ export class ArGame {
       const option = event.target.closest("[data-size]");
       if (option) this.selectSize(option.dataset.size);
     });
-    // Dotknięcie przycisku nie może być jednocześnie dotknięciem podłogi.
+    // Dotknięcie przycisku nie może być jednocześnie postawieniem planszy.
     root.addEventListener("beforexrselect", (event) => {
       if (event.target.closest("button, a, .info, .ar__confirm")) event.preventDefault();
     });
@@ -106,9 +105,10 @@ export class ArGame {
     const token = ++this.token;
     this.level = LEVELS[levelId];
     this.stats.picks = 0;
+    this.spot = null; // miejsce przed telefonem z poprzedniej gry nie może trafić do trybu z kamerą
     this.phase = "placing";
     this.setAnimal(animalId);
-    this.setHint(this.kind === "kamera" ? HINT_CAMERA : HINT_SEARCH);
+    this.setHint(this.kind === "kamera" ? HINT_CAMERA : HINT_SPACE);
     this.selectSize(this.size);
     this.el.start.hidden = true;
     this.retry = null;
@@ -142,7 +142,7 @@ export class ArGame {
       session.onEnd(() => this.sessionEnded()),
       session.onVisibility((state) => this.onVisibility(state)),
     ];
-    if (session.fixedView) this.place(); // nie ma podłogi do szukania, a plansza ma stałe miejsce
+    if (session.fixedView) this.place(); // plansza ma stałe miejsce na ekranie, nie ma czego ustawiać
   }
 
   useKind(kind) {
@@ -183,7 +183,7 @@ export class ArGame {
     this.animator.update(time);
     this.countFrame(time);
     if (this.jumpArmed && jumpDue(this.video.currentTime, this.video.duration)) this.beginJump();
-    if (this.phase === "placing") this.updateOutline(time);
+    if (this.phase === "placing") this.updateOutline(time, tracking);
     if (this.dragger) {
       this.dragger.enabled = tracking;
       if (!tracking) this.dragger.cancel();
@@ -194,30 +194,31 @@ export class ArGame {
     }
   }
 
-  // Obrys podąża za znalezioną powierzchnią, ma rzeczywisty rozmiar planszy i stoi tak jak ona.
-  updateOutline(time) {
-    const { surface } = this.session;
+  // Obrys wisi przed telefonem tam, gdzie stanie plansza, ma jej rzeczywisty rozmiar i idzie za telefonem.
+  // Bez śledzenia ruchu telefonu miejsce byłoby przypadkowe, więc wtedy obrysu nie ma.
+  updateOutline(time, tracking) {
+    const { view } = this.session;
+    const meters = BOARD_METERS[this.size];
     this.placingSince ??= time;
-    this.lastSurface ??= time;
-    if (surface) this.lastSurface = time;
-    this.outline.visible = Boolean(surface);
-    this.setHint(this.placingHint(time, surface));
-    if (!surface) return;
-    this.outline.position.copy(surface.position);
-    this.outline.rotation.y = surface.yaw;
-    this.outline.scale.setScalar(BOARD_METERS[this.size]);
+    this.spot = tracking && view ? aimSpot(view.eye, view.forward, meters, view.tanHalfFov) : null;
+    this.outline.visible = Boolean(this.spot);
+    this.setHint(this.placingHint(time, tracking));
+    if (!this.spot) return;
+    this.outline.position.copy(this.spot.position);
+    this.outline.rotation.y = this.spot.yaw;
+    this.outline.scale.setScalar(meters);
     poseBoard(this.outline.userData.stand, this.outline.userData.plate, this.session.upright);
   }
 
-  placingHint(time, surface) {
+  placingHint(time, tracking) {
     if (!this.boardPlaced && time - this.placingSince < SPACE_HINT_MS) return HINT_SPACE;
-    if (surface) return "Dotknij ekranu, żeby postawić planszę";
-    return time - this.lastSurface > NO_SURFACE_MS ? HINT_NO_SURFACE : HINT_SEARCH;
+    if (!tracking) return HINT_TRACKING;
+    return this.spot ? HINT_AIM : HINT_LEVEL;
   }
 
   pointer(type, ray, id) {
     if (this.phase === "puzzle") this.dragger?.pointer(type, ray, id);
-    else if (type === "down" && this.phase === "placing" && this.session.surface) {
+    else if (type === "down" && this.phase === "placing" && this.spot) {
       if (this.boardPlaced) this.finishMove();
       else this.place();
     }
@@ -225,7 +226,7 @@ export class ArGame {
 
   async place() {
     const token = this.token;
-    this.board = this.session.placeBoard(BOARD_METERS[this.size]);
+    this.board = this.session.placeBoard(BOARD_METERS[this.size], this.spot ?? undefined);
     this.boardPlaced = true;
     this.outline.visible = false;
     this.phase = "intro";
@@ -391,12 +392,11 @@ export class ArGame {
   moveBoard() {
     if (this.phase !== "puzzle") return;
     this.dragger.cancel();
-    this.lastSurface = null;
     this.phase = "placing";
   }
 
   finishMove() {
-    this.session.placeBoard(BOARD_METERS[this.size]);
+    this.session.placeBoard(BOARD_METERS[this.size], this.spot);
     this.outline.visible = false;
     this.setHint("");
     this.phase = "puzzle";
@@ -804,7 +804,7 @@ export class ArGame {
     this.busy = false;
     this.boardPlaced = false;
     this.placingSince = null;
-    this.lastSurface = null;
+    this.spot = null;
     this.tracking = true;
     this.hidden = false;
     this.retry = null;

@@ -1,17 +1,13 @@
-// Sesja AR: obraz, szukanie podłogi, plansza trzymana w miejscu i dotyk.
+// Sesja AR: obraz, kierunek telefonu, plansza trzymana w miejscu i dotyk.
 // XrSession działa na telefonie z ARCore, CameraSession na pozostałych telefonach, a SimulatedSession na komputerze.
 // Reszta kodu nie wie, której używa.
 import * as THREE from "../../vendor/three.module.min.js";
 import { BOARD_H, boardPose, fixedView } from "./uklad.js";
 
-const MAX_TILT_COS = Math.cos((20 * Math.PI) / 180); // bardziej odchylona powierzchnia to już nie podłoga ani stół
-const SIM_SURFACE_MS = 500; // po takim czasie symulator „znajduje” podłogę
-const SIM_TARGET_Y = 1; // wysokość, na którą patrzy kamera symulatora: środek stojącej planszy podłogowej
-// ARCore na słabszych telefonach gubi znalezioną podłogę na sekundę i zaraz ją znajduje (OnePlus Nord 4: 1,3 s
-// przerwy w 6 s). Tyle gra ją pamięta, żeby obrys nie migał, a dotknięcie w przerwie i tak stawiało planszę.
-const SURFACE_HOLD_MS = 1000;
+const SIM_TARGET_Y = 1; // wysokość, na którą patrzy kamera symulatora
 const FACE_MS = 400; // stała czasu obrotu stojącej planszy do gracza: po 0,4 s zostaje 37% kąta
 const FACE_MIN_METERS = 0.2;
+const DEFAULT_TAN_HALF_FOV = Math.tan((45 * Math.PI) / 360); // gdy przeglądarka nie poda macierzy rzutowania
 const XR_RESOLUTION = 0.7; // pełna rozdzielczość telefonu daje tylko 20–25 kl./s przy pustej scenie, a ta stałe 30
 const CAMERA_REQUEST = { audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } };
 
@@ -40,7 +36,8 @@ class Session {
     this.renderer = renderer;
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.01, 40);
-    this.surface = null;
+    this.surface = null; // stałe miejsce planszy w trybie z kamerą
+    this.view = null; // skąd i dokąd patrzy telefon: { eye, forward, tanHalfFov }
     this.tracking = true;
     this.visibilityState = "visible";
     this.ended = false;
@@ -93,12 +90,12 @@ class Session {
     return this.listen("visibility", callback);
   }
 
-  // Stawia planszę na ostatnio znalezionej powierzchni. Kolejne wywołanie przenosi tę samą grupę.
-  // Sesja z `upright` stawia ją pionowo; podklasa ustawia to pole, więc czyta się je dopiero tutaj.
-  placeBoard(widthMeters) {
+  // Stawia planszę w `spot` ({ position, yaw }), domyślnie w stałym miejscu trybu z kamerą. Kolejne wywołanie
+  // przenosi tę samą grupę. Sesja z `upright` stawia ją pionowo; podklasa ustawia to pole, więc czyta się je tutaj.
+  placeBoard(widthMeters, spot = this.surface) {
     poseBoard(this.stand, this.board, this.upright);
-    this.placement.position.copy(this.surface.position);
-    this.placement.rotation.y = this.surface.yaw;
+    this.placement.position.copy(spot.position);
+    this.placement.rotation.y = spot.yaw;
     this.placement.scale.setScalar(widthMeters);
     this.placement.visible = true;
     return this.board;
@@ -120,7 +117,7 @@ export class XrSession extends Session {
     let session;
     try {
       session = await navigator.xr.requestSession("immersive-ar", {
-        requiredFeatures: ["hit-test", "dom-overlay"],
+        requiredFeatures: ["dom-overlay"],
         optionalFeatures: ["anchors"],
         domOverlay: { root: this.overlayRoot },
       });
@@ -146,8 +143,6 @@ export class XrSession extends Session {
       renderer.xr.setReferenceSpaceType("local");
       await setSessionWithoutLayers(renderer, session);
       this.space = renderer.xr.getReferenceSpace();
-      const viewer = await session.requestReferenceSpace("viewer");
-      this.hitSource = await session.requestHitTestSource({ space: viewer });
       if (this.stopRequested) throw new Error("Gracz wyszedł w czasie uruchamiania sesji");
     } catch (error) {
       // Przyznana sesja musi się zakończyć, inaczej zostaje obraz z kamery bez żadnych przycisków.
@@ -161,7 +156,8 @@ export class XrSession extends Session {
     if (!frame) return;
     const pose = frame.getViewerPose(this.space);
     this.tracking = Boolean(pose) && !pose.emulatedPosition;
-    if (pose) this.findSurface(frame, pose, time);
+    if (pose) this.view = viewOf(pose);
+    if (this.anchorWanted) this.createAnchor(frame);
     if (this.anchor && frame.trackedAnchors?.has(this.anchor)) {
       const anchorPose = frame.getPose(this.anchor.anchorSpace, this.space);
       if (anchorPose) this.placement.position.copy(anchorPose.transform.position);
@@ -189,41 +185,28 @@ export class XrSession extends Session {
     rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * (1 - Math.exp(-elapsed / FACE_MS));
   }
 
-  // Pierwsze trafienie w poziomą powierzchnię, z planszą ustawioną bliższym brzegiem do gracza.
-  // Gdy w tej klatce nic nie trafia, przez SURFACE_HOLD_MS zostaje ostatnia znaleziona powierzchnia.
-  findSurface(frame, viewerPose, time) {
-    const up = new THREE.Vector3();
-    for (const hit of frame.getHitTestResults(this.hitSource)) {
-      const pose = hit.getPose(this.space);
-      if (!pose) continue;
-      const { position, orientation } = pose.transform;
-      up.set(0, 1, 0).applyQuaternion(new THREE.Quaternion(orientation.x, orientation.y, orientation.z, orientation.w));
-      if (up.y < MAX_TILT_COS) continue;
-      const eye = viewerPose.transform.position;
-      this.lastHit = hit;
-      this.surface = {
-        position: new THREE.Vector3(position.x, position.y, position.z),
-        yaw: Math.atan2(eye.x - position.x, eye.z - position.z),
-      };
-      this.surfaceTime = time;
-      return;
-    }
-    if (this.surface && time - this.surfaceTime <= SURFACE_HOLD_MS) return;
-    this.lastHit = null;
-    this.surface = null;
-  }
-
-  placeBoard(widthMeters) {
-    const board = super.placeBoard(widthMeters);
+  // Kotwica powstaje w następnej klatce, bo tylko w niej da się ją utworzyć.
+  placeBoard(widthMeters, spot) {
+    const board = super.placeBoard(widthMeters, spot);
     this.anchor?.delete();
     this.anchor = null;
-    this.lastHit
-      ?.createAnchor?.()
-      ?.then((anchor) => {
-        this.anchor = anchor;
+    this.anchorWanted = true;
+    return board;
+  }
+
+  // Kotwica w wolnej przestrzeni: ARCore poprawia nią położenie planszy, kiedy lepiej rozpozna pokój.
+  createAnchor(frame) {
+    this.anchorWanted = false;
+    if (!frame.createAnchor || typeof XRRigidTransform !== "function") return;
+    const ticket = (this.anchorTicket = (this.anchorTicket ?? 0) + 1);
+    const { x, y, z } = this.placement.position;
+    frame
+      .createAnchor(new XRRigidTransform({ x, y, z }), this.space)
+      .then((anchor) => {
+        if (ticket === this.anchorTicket && !this.ended) this.anchor = anchor;
+        else anchor.delete?.(); // plansza zdążyła się przenieść
       })
       .catch(() => {}); // bez kotwicy plansza zostaje w zapisanej pozycji
-    return board;
   }
 
   rayOf(source, frame) {
@@ -431,16 +414,15 @@ class SimulatedSession extends CanvasSession {
     floor.position.y = -0.002;
     this.scene.add(floor, new THREE.GridHelper(12, 24, 0x565a55, 0x6a6e68));
     this.orbit = { angle: 0, elevation: 0.6, radius: 2.6 };
-    this.startTime = performance.now();
     this.attachCanvas({ keydown: (event) => this.onKey(event) });
     this.moveCamera();
     this.renderer.setAnimationLoop((time) => this.frame(time));
   }
 
   frame(time) {
-    if (!this.surface && performance.now() - this.startTime >= SIM_SURFACE_MS) {
-      this.surface = { position: new THREE.Vector3(0, 0, 0), yaw: 0 };
-    }
+    const forward = this.camera.getWorldDirection(new THREE.Vector3());
+    const tanHalfFov = Math.tan((this.camera.fov * Math.PI) / 360) * this.camera.aspect;
+    this.view = { eye: this.camera.position.clone(), forward, tanHalfFov };
     super.frame(time);
   }
 
@@ -465,7 +447,7 @@ class SimulatedSession extends CanvasSession {
   }
 }
 
-// Ustawia planszę względem punktu na powierzchni według boardPose. Tak samo ustawia się obrys przy stawianiu.
+// Ustawia planszę względem wybranego punktu według boardPose. Tak samo ustawia się obrys przy stawianiu.
 export function poseBoard(stand, board, upright) {
   const { tilt, lift, offset } = boardPose(upright);
   stand.rotation.x = tilt;
@@ -492,6 +474,18 @@ async function setSessionWithoutLayers(renderer, session) {
   } finally {
     delete session.renderState;
   }
+}
+
+// Skąd i dokąd patrzy telefon w tej klatce. Kąt widzenia w poziomie daje macierz rzutowania widoku.
+function viewOf(pose) {
+  const { position, orientation } = pose.transform;
+  const quaternion = new THREE.Quaternion(orientation.x, orientation.y, orientation.z, orientation.w);
+  const scaleX = pose.views?.[0]?.projectionMatrix?.[0];
+  return {
+    eye: new THREE.Vector3(position.x, position.y, position.z),
+    forward: new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion),
+    tanHalfFov: scaleX > 0 ? 1 / scaleX : DEFAULT_TAN_HALF_FOV,
+  };
 }
 
 // Przeglądarka zgłasza brak gestu jako SecurityError, a odmowę zgody jako NotAllowedError.

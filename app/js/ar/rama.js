@@ -1,10 +1,11 @@
-// Obraz w ramie: leży na planszy, wstaje, a potem gra na nim film.
+// Obraz w ramie: leży na planszy, wstaje (albo z pionowej planszy wysuwa się do gracza), a potem gra na nim film.
 import * as THREE from "../../vendor/three.module.min.js";
 import { BOARD_H, FRAME_SCALE, THICKNESS } from "./uklad.js";
 import { JUMP_PICTURE, KEY, jumpPlane } from "./skok.js";
 
 const BAR = 34 / 900; // szerokość listwy ramy, taka sama jak w filmie ze skokiem
 const DEPTH = 0.02; // grubość ramy
+const FORWARD = 0.12; // jak daleko przed pionową planszę wysuwa się obraz
 const WOOD = 0x7a5230;
 
 const easeInOut = (k) => (k < 0.5 ? 4 * k ** 3 : 1 - (-2 * k + 2) ** 3 / 2);
@@ -14,10 +15,13 @@ const mix = (a, b, k) => a + (b - a) * k;
 // a stojąc, ma dolną krawędź na dalszym brzegu planszy i patrzy na gracza.
 const LYING = { y: THICKNESS + 0.004, z: BOARD_H + BAR, rotation: -Math.PI / 2, scale: 1 }; // nad ułożonymi elementami
 const STANDING = { y: 0, z: 0, rotation: 0, scale: FRAME_SCALE };
+// Pionowa plansza już patrzy na gracza, więc obraz nie obraca się, tylko wysuwa i rośnie wokół jej środka.
+const FORWARD_POSE = { y: FORWARD, z: BOARD_H / 2 + FRAME_SCALE * (BAR + BOARD_H / 2), rotation: -Math.PI / 2, scale: FRAME_SCALE };
 
 export class Frame {
-  constructor({ parent, animator, image }) {
+  constructor({ parent, animator, image, upright = false }) {
     this.animator = animator;
+    this.standing = upright ? FORWARD_POSE : STANDING;
     this.group = new THREE.Group();
     this.group.position.x = 0.5;
     // Przezroczysty obraz nie może zapisywać głębi, bo zasłaniałby leżącą pod nim planszę.
@@ -35,12 +39,13 @@ export class Frame {
     parent.add(this.group);
   }
 
-  // Postęp od 0 (leży) do 1 (stoi).
+  // Postęp od 0 (leży na planszy) do 1 (stoi przed graczem).
   applyPose(k) {
-    this.group.position.y = mix(LYING.y, STANDING.y, k);
-    this.group.position.z = mix(LYING.z, STANDING.z, k);
-    this.group.rotation.x = mix(LYING.rotation, STANDING.rotation, k);
-    this.group.scale.setScalar(mix(LYING.scale, STANDING.scale, k));
+    const end = this.standing;
+    this.group.position.y = mix(LYING.y, end.y, k);
+    this.group.position.z = mix(LYING.z, end.z, k);
+    this.group.rotation.x = mix(LYING.rotation, end.rotation, k);
+    this.group.scale.setScalar(mix(LYING.scale, end.scale, k));
     this.wood.opacity = Math.min(1, k * 4);
     this.back.visible = k > 0;
   }

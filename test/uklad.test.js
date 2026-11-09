@@ -12,6 +12,9 @@ import {
   HOME_MARGIN,
   HOME_SPREAD,
   TILT,
+  UPRIGHT_TOP,
+  boardPose,
+  uprightBottom,
   cellSize,
   targetOf,
   planHomes,
@@ -184,6 +187,36 @@ test("clampToArea zatrzymuje punkt na granicy obszaru", () => {
   assert.deepEqual(clampToArea({ x: 5, z: -5 }), { x: 1 + DRAG_MARGIN, z: -DRAG_MARGIN });
   assert.deepEqual(clampToArea({ x: -5, z: 5 }), { x: -DRAG_MARGIN, z: H + DRAG_MARGIN });
   assert.deepEqual(clampToArea({ x: 0.5, z: 0.2 }), { x: 0.5, z: 0.2 });
+});
+
+// Najniższy punkt elementu o środku w z: pół komórki, wypustka (do 0,25 krótszego boku) i obrót o TILT.
+function lowestPoint(z, level) {
+  const { cw, ch, size } = cellSize(level);
+  return z + (ch / 2 + 0.25 * size) * Math.cos(TILT) + (cw / 2) * Math.sin(TILT);
+}
+
+test("pionowa plansza stoi tak wysoko, że rozsypane pod nią elementy nie wchodzą w podłogę", () => {
+  for (const level of Object.values(LEVELS)) {
+    for (let seed = 0; seed < 20; seed++) {
+      let s = seed + 1;
+      const random = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+      for (const home of planHomes(level, random)) assert.ok(lowestPoint(home.z, level) <= UPRIGHT_TOP, `${level.id} z=${home.z}`);
+    }
+  }
+});
+
+test("przeciągany element na pionowej planszy nie zejdzie niżej niż rozsypane", () => {
+  for (const level of Object.values(LEVELS)) {
+    const bottom = uprightBottom(level);
+    assert.ok(lowestPoint(bottom, level) <= UPRIGHT_TOP, level.id);
+    assert.ok(Math.max(...planHomes(level).map((home) => home.z)) <= bottom + 1e-9, level.id);
+    assert.equal(clampToArea({ x: 0.5, z: 5 }, bottom).z, bottom);
+  }
+});
+
+test("boardPose: leżąca ma środek w punkcie powierzchni, stojąca górny brzeg nad nim", () => {
+  assert.deepEqual(boardPose(false), { tilt: 0, lift: 0, offset: { x: -0.5, z: -H / 2 } });
+  assert.deepEqual(boardPose(true), { tilt: Math.PI / 2, lift: UPRIGHT_TOP, offset: { x: -0.5, z: 0 } });
 });
 
 test("intersectBoard: promień w dół trafia, a prawie poziomy nie", () => {

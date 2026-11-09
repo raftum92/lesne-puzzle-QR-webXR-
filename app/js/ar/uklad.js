@@ -1,6 +1,7 @@
 // Logika planszy w trybie AR, bez Three.js i bez DOM.
 // Jednostki planszy: szerokość 1, wysokość 9/16, początek w lewym dalszym rogu, oś x w prawo, oś z do gracza.
-// Na metry przelicza to skala grupy z planszą.
+// Na metry przelicza to skala grupy z planszą. W trybie W przestrzeni plansza stoi pionowo (boardPose): oś z idzie
+// wtedy w dół, a oś y do gracza, więc „przed planszą” znaczy „pod nią”.
 
 export const BOARD_METERS = { stol: 0.5, podloga: 1.2 };
 export const BOARD_H = 9 / 16;
@@ -12,6 +13,9 @@ export const DRAG_MARGIN = 0.7; // jak daleko poza planszę można wynieść ele
 export const HOME_MARGIN = 0.04; // odstęp rozsypanych elementów od planszy
 export const HOME_SPREAD = 0.45; // szerokość pasa, w którym leżą rozsypane elementy
 export const TILT = (9 * Math.PI) / 180; // największy obrót rozsypanego elementu, jak w puzzle.js
+// Wysokość górnego brzegu stojącej planszy nad powierzchnią: elementy rozsypane pod planszą, z wypustkami
+// i obrotem, mieszczą się nad podłogą. Przy podłodze to około 1,4 m, przy stole około 58 cm nad blatem.
+export const UPRIGHT_TOP = BOARD_H + HOME_MARGIN + HOME_SPREAD + 0.1;
 
 const PITCH = 1.05; // odstęp między rozsypanymi elementami względem wielkości komórki
 const NEAR_FACTOR = 1.6; // w jakim promieniu świeci miejsce, jak markNear w puzzle.js
@@ -117,8 +121,23 @@ export function pickPiece(pieces, point, level) {
   return best;
 }
 
-export function clampToArea({ x, z }) {
-  return { x: clamp(x, -DRAG_MARGIN, 1 + DRAG_MARGIN), z: clamp(z, -DRAG_MARGIN, BOARD_H + DRAG_MARGIN) };
+// `bottom` to największe z: na stojącej planszy niżej element wszedłby w podłogę.
+export function clampToArea({ x, z }, bottom = BOARD_H + DRAG_MARGIN) {
+  return { x: clamp(x, -DRAG_MARGIN, 1 + DRAG_MARGIN), z: clamp(z, -DRAG_MARGIN, bottom) };
+}
+
+// Najniżej leżące rozsypane elementy: dalej w dół nie da się przeciągnąć elementu na stojącej planszy.
+export function uprightBottom(level) {
+  return BOARD_H + HOME_MARGIN + HOME_SPREAD - cellSize(level).ch / 2;
+}
+
+// Położenie planszy względem punktu na powierzchni, w jednostkach planszy: obrót wokół osi x, wysokość obrotu
+// i przesunięcie samej planszy. Leżąca ma środek w tym punkcie; stojąca ma górny brzeg UPRIGHT_TOP nad nim
+// i przód zwrócony do gracza.
+export function boardPose(upright) {
+  return upright
+    ? { tilt: Math.PI / 2, lift: UPRIGHT_TOP, offset: { x: -0.5, z: 0 } }
+    : { tilt: 0, lift: 0, offset: { x: -0.5, z: -BOARD_H / 2 } };
 }
 
 function distanceToTarget(piece, point, level) {

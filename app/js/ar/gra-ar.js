@@ -4,9 +4,9 @@ import { ANIMALS, nextAnimal } from "../zwierzeta.js";
 import { LEVELS, pieceCount, piecesLabel } from "../poziomy.js";
 import { createCuts } from "../ksztalty.js";
 import { renderInfo } from "../info.js";
-import { createSession } from "./sesja.js";
+import { createSession, poseBoard } from "./sesja.js";
 import { Animator } from "./animacje.js";
-import { BOARD_H, BOARD_METERS, LIFT, planFrontHomes, planHomes, targetOf } from "./uklad.js";
+import { BOARD_H, BOARD_METERS, LIFT, planFrontHomes, planHomes, targetOf, uprightBottom } from "./uklad.js";
 import { Frame } from "./rama.js";
 import { JUMP_FADE_MS, canJump, jumpDue } from "./skok.js";
 import { Dragger } from "./przeciaganie.js";
@@ -194,7 +194,7 @@ export class ArGame {
     }
   }
 
-  // Obrys podąża za znalezioną powierzchnią i ma rzeczywisty rozmiar planszy.
+  // Obrys podąża za znalezioną powierzchnią, ma rzeczywisty rozmiar planszy i stoi tak jak ona.
   updateOutline(time) {
     const { surface } = this.session;
     this.placingSince ??= time;
@@ -206,6 +206,7 @@ export class ArGame {
     this.outline.position.copy(surface.position);
     this.outline.rotation.y = surface.yaw;
     this.outline.scale.setScalar(BOARD_METERS[this.size]);
+    poseBoard(this.outline.userData.stand, this.outline.userData.plate, this.session.upright);
   }
 
   placingHint(time, surface) {
@@ -233,7 +234,7 @@ export class ArGame {
     if (token !== this.token) return;
     if (!image) return this.setHint(HINT_IMAGE);
     this.image = image;
-    this.frameObject = new Frame({ parent: this.board, animator: this.animator, image });
+    this.frameObject = new Frame({ parent: this.board, animator: this.animator, image, upright: this.session.upright });
     await this.frameObject.show(400);
     if (token === this.token) await this.memorize(token);
   }
@@ -279,6 +280,7 @@ export class ArGame {
     this.dragger = new Dragger({
       pieces: this.pieces,
       level,
+      bottom: this.session.upright ? uprightBottom(level) : undefined,
       toBoard: (ray) => this.toBoard(ray),
       onPick: (piece) => this.onPick(piece),
       onMove: (piece) => this.render(piece),
@@ -423,7 +425,7 @@ export class ArGame {
     });
   }
 
-  // Szwy znikają, obraz wstaje z podłogi, a w locie zaczyna się ruszać.
+  // Szwy znikają, obraz wstaje z podłogi (z pionowej planszy wysuwa się do gracza), a w locie zaczyna się ruszać.
   async reveal(token) {
     await this.wait(450); // błysk ostatniego elementu
     if (token !== this.token) return;
@@ -858,19 +860,26 @@ function disposeObject(root) {
   });
 }
 
-// Prostokątny obrys planszy z czterech pasków leżących na podłodze; początek układu to jego środek.
+// Prostokątny obrys planszy z czterech pasków. Ma te same trzy poziomy grup co plansza w sesji (sesja.js),
+// żeby poseBoard ustawiał go tak jak ją: leżący albo stojący.
 function createOutline() {
   const group = new THREE.Group();
+  const stand = new THREE.Group();
+  const plate = new THREE.Group(); // układ planszy: początek w lewym dalszym rogu
   const material = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 });
   const bar = (width, depth, x, z) => {
     const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, depth).rotateX(-Math.PI / 2), material);
     mesh.position.set(x, 0.002, z);
-    group.add(mesh);
+    plate.add(mesh);
   };
-  bar(1, OUTLINE_WIDTH, 0, -BOARD_H / 2);
-  bar(1, OUTLINE_WIDTH, 0, BOARD_H / 2);
-  bar(OUTLINE_WIDTH, BOARD_H, -0.5, 0);
-  bar(OUTLINE_WIDTH, BOARD_H, 0.5, 0);
+  bar(1, OUTLINE_WIDTH, 0.5, 0);
+  bar(1, OUTLINE_WIDTH, 0.5, BOARD_H);
+  bar(OUTLINE_WIDTH, BOARD_H, 0, BOARD_H / 2);
+  bar(OUTLINE_WIDTH, BOARD_H, 1, BOARD_H / 2);
+  poseBoard(stand, plate, false);
+  stand.add(plate);
+  group.add(stand);
+  group.userData = { stand, plate };
   group.visible = false;
   return group;
 }

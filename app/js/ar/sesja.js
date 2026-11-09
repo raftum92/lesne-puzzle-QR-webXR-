@@ -2,10 +2,16 @@
 // XrSession działa na telefonie z ARCore, CameraSession na pozostałych telefonach, a SimulatedSession na komputerze.
 // Reszta kodu nie wie, której używa.
 import * as THREE from "../../vendor/three.module.min.js";
-import { BOARD_H, fixedView } from "./uklad.js";
+import { BOARD_H, boardPose, fixedView } from "./uklad.js";
 
 const MAX_TILT_COS = Math.cos((20 * Math.PI) / 180); // bardziej odchylona powierzchnia to już nie podłoga ani stół
 const SIM_SURFACE_MS = 500; // po takim czasie symulator „znajduje” podłogę
+const SIM_TARGET_Y = 1; // wysokość, na którą patrzy kamera symulatora: środek stojącej planszy podłogowej
+// ARCore na słabszych telefonach gubi znalezioną podłogę na sekundę i zaraz ją znajduje (OnePlus Nord 4: 1,3 s
+// przerwy w 6 s). Tyle gra ją pamięta, żeby obrys nie migał, a dotknięcie w przerwie i tak stawiało planszę.
+const SURFACE_HOLD_MS = 1000;
+const FACE_MS = 400; // stała czasu obrotu stojącej planszy do gracza: po 0,4 s zostaje 37% kąta
+const FACE_MIN_METERS = 0.2;
 const XR_RESOLUTION = 0.7; // pełna rozdzielczość telefonu daje tylko 20–25 kl./s przy pustej scenie, a ta stałe 30
 const CAMERA_REQUEST = { audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } };
 
@@ -39,11 +45,14 @@ class Session {
     this.visibilityState = "visible";
     this.ended = false;
     this.listeners = { frame: new Set(), pointer: new Set(), end: new Set(), visibility: new Set() };
-    // Grupa zewnętrzna stoi na środku planszy; wewnętrzna ma początek w lewym dalszym rogu, jak uklad.js.
+    // Grupa zewnętrzna stoi w punkcie powierzchni i patrzy na gracza, środkowa stawia planszę do pionu,
+    // a wewnętrzna ma początek w lewym dalszym rogu, jak uklad.js.
     this.placement = new THREE.Group();
+    this.stand = new THREE.Group();
     this.board = new THREE.Group();
-    this.board.position.set(-0.5, 0, -BOARD_H / 2);
-    this.placement.add(this.board);
+    poseBoard(this.stand, this.board, false);
+    this.stand.add(this.board);
+    this.placement.add(this.stand);
     this.placement.visible = false;
     this.scene.add(this.placement);
   }
@@ -85,7 +94,9 @@ class Session {
   }
 
   // Stawia planszę na ostatnio znalezionej powierzchni. Kolejne wywołanie przenosi tę samą grupę.
+  // Sesja z `upright` stawia ją pionowo; podklasa ustawia to pole, więc czyta się je dopiero tutaj.
   placeBoard(widthMeters) {
+    poseBoard(this.stand, this.board, this.upright);
     this.placement.position.copy(this.surface.position);
     this.placement.rotation.y = this.surface.yaw;
     this.placement.scale.setScalar(widthMeters);
@@ -103,6 +114,8 @@ class Session {
 }
 
 export class XrSession extends Session {
+  upright = true; // pionowa plansza: leżącą widać z telefonu pod zbyt ostrym kątem
+
   async start() {
     let session;
     try {
@@ -148,11 +161,12 @@ export class XrSession extends Session {
     if (!frame) return;
     const pose = frame.getViewerPose(this.space);
     this.tracking = Boolean(pose) && !pose.emulatedPosition;
-    if (pose) this.findSurface(frame, pose);
+    if (pose) this.findSurface(frame, pose, time);
     if (this.anchor && frame.trackedAnchors?.has(this.anchor)) {
       const anchorPose = frame.getPose(this.anchor.anchorSpace, this.space);
       if (anchorPose) this.placement.position.copy(anchorPose.transform.position);
     }
+    if (pose) this.faceViewer(pose.transform.position, time);
     for (const [source, id] of this.touches) {
       const ray = this.rayOf(source, frame);
       if (ray) this.emit("pointer", "move", ray, id);
@@ -161,8 +175,23 @@ export class XrSession extends Session {
     this.renderer.render(this.scene, this.camera);
   }
 
+  // Z boku widać tylko krawędź stojącej planszy. Gracz chodzi, a ARCore przesuwa kotwicę, więc plansza płynnie
+  // obraca się wokół pionowej osi przodem do telefonu, krótszą drogą.
+  faceViewer(eye, time) {
+    const elapsed = time - (this.facedAt ?? time);
+    this.facedAt = time;
+    if (!this.upright || !this.placement.visible) return;
+    const { position, rotation } = this.placement;
+    const dx = eye.x - position.x;
+    const dz = eye.z - position.z;
+    if (Math.hypot(dx, dz) < FACE_MIN_METERS) return; // telefon tuż nad planszą: kierunek byłby przypadkowy
+    const turn = Math.atan2(dx, dz) - rotation.y;
+    rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * (1 - Math.exp(-elapsed / FACE_MS));
+  }
+
   // Pierwsze trafienie w poziomą powierzchnię, z planszą ustawioną bliższym brzegiem do gracza.
-  findSurface(frame, viewerPose) {
+  // Gdy w tej klatce nic nie trafia, przez SURFACE_HOLD_MS zostaje ostatnia znaleziona powierzchnia.
+  findSurface(frame, viewerPose, time) {
     const up = new THREE.Vector3();
     for (const hit of frame.getHitTestResults(this.hitSource)) {
       const pose = hit.getPose(this.space);
@@ -176,8 +205,10 @@ export class XrSession extends Session {
         position: new THREE.Vector3(position.x, position.y, position.z),
         yaw: Math.atan2(eye.x - position.x, eye.z - position.z),
       };
+      this.surfaceTime = time;
       return;
     }
+    if (this.surface && time - this.surfaceTime <= SURFACE_HOLD_MS) return;
     this.lastHit = null;
     this.surface = null;
   }
@@ -385,6 +416,7 @@ export class CameraSession extends CanvasSession {
 
 // Próba bez telefonu: szara podłoga, mysz zamiast palca, strzałki krążą kamerą.
 class SimulatedSession extends CanvasSession {
+  upright = true; // jak na telefonie z ARCore
   // Próba błędów startu: ?ar=symulacja&blad=denied albo unavailable, albo gesture.
   static nextError = new URLSearchParams(location.search).get("blad");
 
@@ -428,9 +460,17 @@ class SimulatedSession extends CanvasSession {
       radius * Math.sin(elevation),
       radius * Math.cos(elevation) * Math.cos(angle),
     );
-    this.camera.lookAt(0, 0, 0);
+    this.camera.lookAt(0, SIM_TARGET_Y, 0); // środek stojącej planszy
     this.camera.updateMatrixWorld();
   }
+}
+
+// Ustawia planszę względem punktu na powierzchni według boardPose. Tak samo ustawia się obrys przy stawianiu.
+export function poseBoard(stand, board, upright) {
+  const { tilt, lift, offset } = boardPose(upright);
+  stand.rotation.x = tilt;
+  stand.position.y = lift;
+  board.position.set(offset.x, 0, offset.z);
 }
 
 // Three.js 0.170 rysuje przez XRProjectionLayer, gdy tylko sesja ma pole renderState.layers. Chrome 143 na Androidzie

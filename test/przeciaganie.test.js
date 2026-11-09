@@ -121,3 +121,10 @@ test("ułożony element nie daje się chwycić", () => {
   dragger.pointer("down", ray(-0.3, 0.1), 1);
   assert.deepEqual(log, []);
 });
+
+test("na pionowej planszy element nie zejdzie niżej niż dolna granica", () => {
+  const { piece, dragger } = setup({ bottom: 0.9 });
+  dragger.pointer("down", ray(-0.3, 0.1), 1);
+  dragger.pointer("move", ray(-0.3, 3), 1);
+  assert.equal(piece.z, 0.9);
+});

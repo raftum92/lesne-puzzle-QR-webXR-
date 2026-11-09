@@ -140,16 +140,17 @@ export function facingTilt(eye, position) {
   return Math.PI / 2 - Math.atan2(eye.y - position.y, Math.hypot(eye.x - position.x, eye.z - position.z));
 }
 
-// Miejsce wiszącej planszy przed telefonem: `eye` to pozycja telefonu, `forward` kierunek kamery, `meters` szerokość
-// planszy, a `tanHalfFov` i `tanHalfFovY` to tangensy połowy kąta widzenia w poziomie i w pionie. Elementy leżą
-// w siatce pod planszą (planFrontHomes), bo telefon w pionie widzi w poziomie tylko około 33°: z elementami po bokach
-// plansza wisiałaby kilka metrów dalej. Środek całości (UPRIGHT_PIVOT) jest tam, gdzie celuje telefon, tak blisko,
-// jak pozwala kadr, a plansza jest prostopadle do linii celowania. Zwraca null, gdy telefon patrzy prawie pionowo.
-export function aimSpot(eye, forward, meters, tanHalfFov, tanHalfFovY = Infinity) {
+// Miejsce wiszącej planszy przed telefonem: `eye` to pozycja telefonu, `forward` kierunek kamery, a `tanHalfFov`
+// i `tanHalfFovY` to tangensy połowy kąta widzenia w poziomie i w pionie. Elementy leżą w siatce pod planszą
+// (planFrontHomes), bo telefon w pionie widzi w poziomie tylko około 33°: z elementami po bokach plansza wisiałaby
+// kilka metrów dalej. Środek całości (UPRIGHT_PIVOT) jest tam, gdzie celuje telefon, tak blisko, żeby mała plansza
+// z elementami mieściła się w kadrze, a plansza jest prostopadle do linii celowania. Duża wisi w tym samym miejscu,
+// więc jest na ekranie większa i wychodzi poza kadr. Zwraca null, gdy telefon patrzy prawie pionowo.
+export function aimSpot(eye, forward, tanHalfFov, tanHalfFovY = Infinity) {
   const length = Math.hypot(forward.x, forward.y, forward.z);
   if (Math.hypot(forward.x, forward.z) < AIM_MIN_LEVEL * length) return null;
-  const halfWidth = (FRONT_PITCH / 2) * meters;
-  const halfHeight = (FRONT_BOTTOM / 2) * meters;
+  const halfWidth = (FRONT_PITCH / 2) * BOARD_METERS.mala;
+  const halfHeight = (FRONT_BOTTOM / 2) * BOARD_METERS.mala;
   const k = (AIM_ROOM * Math.max(halfWidth / tanHalfFov, halfHeight / tanHalfFovY)) / length;
   const position = { x: eye.x + forward.x * k, y: eye.y + forward.y * k, z: eye.z + forward.z * k };
   return { position, yaw: Math.atan2(eye.x - position.x, eye.z - position.z), tilt: facingTilt(eye, position) };

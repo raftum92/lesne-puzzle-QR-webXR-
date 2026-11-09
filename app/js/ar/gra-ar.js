@@ -200,7 +200,7 @@ export class ArGame {
     const { view } = this.session;
     const meters = BOARD_METERS[this.size];
     this.placingSince ??= time;
-    this.spot = tracking && view ? aimSpot(view.eye, view.forward, meters, view.tanHalfFov, view.tanHalfFovY) : null;
+    this.spot = tracking && view ? aimSpot(view.eye, view.forward, view.tanHalfFov, view.tanHalfFovY) : null;
     this.outline.visible = Boolean(this.spot);
     this.setHint(this.placingHint(time, tracking));
     if (!this.spot) return;

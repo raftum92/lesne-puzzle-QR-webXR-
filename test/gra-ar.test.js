@@ -317,12 +317,27 @@ test("obrys wisi przed telefonem i idzie za nim, bez szukania podłogi", async (
   game.selectSize("mala");
   const eye = { x: 0, y: 1.4, z: 0 };
   renderer.loop(0, xrFrame(viewerPose(eye)));
-  const spot = aimSpot(eye, { x: 0, y: 0, z: -1 }, BOARD_METERS.mala, 0.5, 1);
+  const spot = aimSpot(eye, { x: 0, y: 0, z: -1 }, 0.5, 1);
   assert.ok(game.outline.visible);
   assert.ok(near(game.outline.position.y, spot.position.y) && near(game.outline.position.z, spot.position.z), "obrys tam, gdzie stanie plansza");
   assert.ok(near(game.outline.userData.stand.rotation.x, spot.tilt), "obrys nachylony tak jak plansza");
   renderer.loop(50, xrFrame(viewerPose(eye, { yaw: Math.PI / 2 })));
   assert.ok(near(game.outline.position.x, spot.position.z) && near(game.outline.position.z, 0), "obrys idzie za telefonem");
+  finish(game);
+});
+
+test("duża plansza wisi tam, gdzie mała, i jest od niej większa", async () => {
+  const { game, renderer } = makeGame();
+  xrApi.requestSession = async () => fakeXr();
+  await game.start("lis", "latwy");
+  const look = xrFrame(viewerPose({ x: 0, y: 1.4, z: 0 }));
+  game.selectSize("mala");
+  renderer.loop(0, look);
+  const small = { at: game.outline.position.clone(), scale: game.outline.scale.x };
+  game.selectSize("duza");
+  renderer.loop(50, look);
+  assert.ok(game.outline.position.distanceTo(small.at) < 1e-9, "w tym samym miejscu");
+  assert.ok(near(game.outline.scale.x / small.scale, BOARD_METERS.duza / BOARD_METERS.mala), "większa o tyle, o ile szersza");
   finish(game);
 });
 

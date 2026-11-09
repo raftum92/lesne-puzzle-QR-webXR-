@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { Euler, Group, Quaternion, Vector3 } from "../app/vendor/three.module.min.js";
-import { BOARD_H, BOARD_METERS, FRAME_SCALE, aimSpot, targetOf } from "../app/js/ar/uklad.js";
+import { BOARD_H, BOARD_METERS, FRAME_SCALE, UPRIGHT_PIVOT, aimSpot, targetOf } from "../app/js/ar/uklad.js";
 
 globalThis.location = new URL("http://localhost/app/");
 globalThis.matchMedia = () => ({ matches: false });
@@ -188,7 +188,8 @@ test("koniec układania czyści podpowiedź", () => {
   finish(game);
 });
 
-// Plansza postawiona przez sesję W przestrzeni metr przed graczem, który stoi od strony +z; środek na wysokości 1,25 m.
+// Plansza postawiona przez sesję W przestrzeni metr przed graczem, który stoi od strony +z: środek całości z elementami
+// na wysokości 1,25 m, plansza pionowo.
 const SPOT = { position: { x: 0, y: 1.25, z: -1 }, yaw: 0 };
 function standingBoard(meters = 1.2) {
   const session = new XrSession(new FakeElement(), fakeRenderer());
@@ -216,13 +217,38 @@ async function startedXr() {
   return { session, renderer };
 }
 
-test("w trybie W przestrzeni plansza wisi pionowo przodem do gracza, ze środkiem w wybranym miejscu", () => {
+test("w trybie W przestrzeni plansza wisi pionowo przodem do gracza, ze środkiem całości w wybranym miejscu", () => {
   const { board } = standingBoard(1.2);
-  const center = toWorld(board, 0.5, 0, BOARD_H / 2);
+  const pivot = toWorld(board, 0.5, 0, UPRIGHT_PIVOT);
   const top = toWorld(board, 0.5, 0, 0);
-  assert.ok(near(center.x, 0) && near(center.y, 1.25) && near(center.z, -1), "środek planszy w wybranym miejscu");
-  assert.ok(near(top.y, 1.25 + (BOARD_H / 2) * 1.2) && near(top.z, -1), "górny brzeg nad środkiem: plansza stoi pionowo");
+  assert.ok(near(pivot.x, 0) && near(pivot.y, 1.25) && near(pivot.z, -1), "środek całości w wybranym miejscu");
+  assert.ok(near(top.y, 1.25 + UPRIGHT_PIVOT * 1.2) && near(top.z, -1), "plansza nad nim, pionowo");
   assert.ok(near(direction(board, 0, 1, 0).z, 1), "przód planszy patrzy na gracza");
+});
+
+test("plansza postawiona poniżej telefonu odchyla się do niego jak pulpit", async () => {
+  const { session, renderer } = await startedXr();
+  const eye = { x: 0, y: 1.25 + 1, z: 0 }; // telefon metr nad środkiem planszy i metr przed nią: 45° w dół
+  session.placeBoard(0.5, { position: { x: 0, y: 1.25, z: -1 }, yaw: 0, tilt: Math.PI / 4 });
+  session.scene.updateMatrixWorld(true);
+  const toEye = new Vector3(0, 1, 1).normalize();
+  assert.ok(direction(session.board, 0, 1, 0).dot(toEye) > 0.999, "przód planszy na wprost telefonu");
+  for (let t = 0; t <= 3000; t += 50) renderer.loop(t, xrFrame(viewerPose(eye, { pitch: -Math.PI / 4 })));
+  session.scene.updateMatrixWorld(true);
+  assert.ok(direction(session.board, 0, 1, 0).dot(toEye) > 0.999, "zostaje zwrócona do telefonu");
+  const pivot = toWorld(session.board, 0.5, 0, UPRIGHT_PIVOT);
+  assert.ok(near(pivot.y, 1.25) && near(pivot.z, -1), "obraca się wokół środka całości");
+});
+
+test("gdy gracz kuca albo wstaje, plansza płynnie odchyla się do telefonu", async () => {
+  const { session, renderer } = await startedXr();
+  session.placeBoard(0.5, { position: { x: 0, y: 1.25, z: -1 }, yaw: 0, tilt: Math.PI / 2 });
+  const eye = { x: 0, y: 2.25, z: 0 }; // telefon nagle metr wyżej
+  renderer.loop(0, xrFrame(viewerPose(eye)));
+  renderer.loop(50, xrFrame(viewerPose(eye)));
+  assert.ok(session.tilt < Math.PI / 2 && session.tilt > Math.PI / 2 - 0.3, `płynnie, nie skokowo (${session.tilt})`);
+  for (let t = 100; t <= 3000; t += 50) renderer.loop(t, xrFrame(viewerPose(eye)));
+  assert.ok(near(session.tilt, Math.PI / 4, 0.01), `po chwili prostopadle do telefonu (${session.tilt})`);
 });
 
 test("na pionowej planszy palec trafia tam, gdzie celuje", () => {
@@ -262,13 +288,25 @@ test("na pionowej planszy obraz wysuwa się do gracza i rośnie, zamiast wstawa�
   assert.ok(near(direction(picture, 0, 0, 1).z, 1, 1e-6), "obraz patrzy na gracza");
 });
 
+// Telefon w pionie widzi w poziomie tylko około 33°, więc elementy po bokach odsuwały planszę za daleko.
+test("na wiszącej planszy elementy leżą w siatce pod nią, nie po bokach", () => {
+  const { game } = gameInProgress();
+  game.session.upright = true;
+  game.buildPuzzle();
+  for (const piece of game.pieces) {
+    assert.ok(piece.home.z > BOARD_H, "pod planszą");
+    assert.ok(Math.abs(piece.home.x - 0.5) < 0.5, "nie wystaje w bok poza planszę");
+  }
+  finish(game);
+});
+
 test("sesja podaje, skąd i dokąd patrzy telefon", async () => {
   const { session, renderer } = await startedXr();
   renderer.loop(0, xrFrame(viewerPose({ x: 0, y: 1.4, z: 0 }, { yaw: Math.PI / 2, tanHalf: 0.4 })));
-  const { eye, forward, tanHalfFov } = session.view;
+  const { eye, forward, tanHalfFov, tanHalfFovY } = session.view;
   assert.deepEqual([eye.x, eye.y, eye.z], [0, 1.4, 0]);
   assert.ok(near(forward.x, -1) && near(forward.z, 0), "obrócony o 90° w lewo telefon patrzy w stronę -x");
-  assert.ok(near(tanHalfFov, 0.4));
+  assert.ok(near(tanHalfFov, 0.4) && near(tanHalfFovY, 1));
 });
 
 // Na słabszych telefonach ARCore długo szuka podłogi albo jej nie znajduje (OnePlus Nord 4, 9.11.2026).
@@ -279,9 +317,10 @@ test("obrys wisi przed telefonem i idzie za nim, bez szukania podłogi", async (
   game.selectSize("mala");
   const eye = { x: 0, y: 1.4, z: 0 };
   renderer.loop(0, xrFrame(viewerPose(eye)));
-  const spot = aimSpot(eye, { x: 0, y: 0, z: -1 }, BOARD_METERS.mala, 0.5);
+  const spot = aimSpot(eye, { x: 0, y: 0, z: -1 }, BOARD_METERS.mala, 0.5, 1);
   assert.ok(game.outline.visible);
   assert.ok(near(game.outline.position.y, spot.position.y) && near(game.outline.position.z, spot.position.z), "obrys tam, gdzie stanie plansza");
+  assert.ok(near(game.outline.userData.stand.rotation.x, spot.tilt), "obrys nachylony tak jak plansza");
   renderer.loop(50, xrFrame(viewerPose(eye, { yaw: Math.PI / 2 })));
   assert.ok(near(game.outline.position.x, spot.position.z) && near(game.outline.position.z, 0), "obrys idzie za telefonem");
   finish(game);

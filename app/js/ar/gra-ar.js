@@ -6,7 +6,7 @@ import { createCuts } from "../ksztalty.js";
 import { renderInfo } from "../info.js";
 import { createSession, poseBoard } from "./sesja.js";
 import { Animator } from "./animacje.js";
-import { BOARD_H, BOARD_METERS, LIFT, aimSpot, planFrontHomes, planHomes, targetOf, uprightBottom } from "./uklad.js";
+import { BOARD_H, BOARD_METERS, LIFT, UPRIGHT_PIVOT, aimSpot, planFrontHomes, planHomes, targetOf } from "./uklad.js";
 import { Frame } from "./rama.js";
 import { JUMP_FADE_MS, canJump, jumpDue } from "./skok.js";
 import { Dragger } from "./przeciaganie.js";
@@ -194,20 +194,20 @@ export class ArGame {
     }
   }
 
-  // Obrys wisi przed telefonem tam, gdzie stanie plansza, ma jej rzeczywisty rozmiar i idzie za telefonem.
+  // Obrys wisi tam, gdzie celuje telefon i gdzie stanie plansza, ma jej rzeczywisty rozmiar i idzie za telefonem.
   // Bez śledzenia ruchu telefonu miejsce byłoby przypadkowe, więc wtedy obrysu nie ma.
   updateOutline(time, tracking) {
     const { view } = this.session;
     const meters = BOARD_METERS[this.size];
     this.placingSince ??= time;
-    this.spot = tracking && view ? aimSpot(view.eye, view.forward, meters, view.tanHalfFov) : null;
+    this.spot = tracking && view ? aimSpot(view.eye, view.forward, meters, view.tanHalfFov, view.tanHalfFovY) : null;
     this.outline.visible = Boolean(this.spot);
     this.setHint(this.placingHint(time, tracking));
     if (!this.spot) return;
     this.outline.position.copy(this.spot.position);
     this.outline.rotation.y = this.spot.yaw;
     this.outline.scale.setScalar(meters);
-    poseBoard(this.outline.userData.stand, this.outline.userData.plate, this.session.upright);
+    poseBoard(this.outline.userData.stand, this.outline.userData.plate, this.spot.tilt, UPRIGHT_PIVOT);
   }
 
   placingHint(time, tracking) {
@@ -265,7 +265,8 @@ export class ArGame {
     this.pieceTexture.anisotropy = 4; // elementy widać pod ostrym kątem, leżą na podłodze
     this.pieceTexture.needsUpdate = true;
     this.shadowTexture ??= createShadowTexture();
-    const homes = this.session.frontHomes ? planFrontHomes(level) : planHomes(level);
+    // Wisząca plansza i pionowy ekran z kamerą: elementy w siatce pod planszą, żeby całość była wąska i blisko.
+    const homes = this.session.frontHomes || this.session.upright ? planFrontHomes(level) : planHomes(level);
     this.stack = 0;
     this.pieces = [];
     for (let r = 0; r < level.rows; r++) {
@@ -281,7 +282,6 @@ export class ArGame {
     this.dragger = new Dragger({
       pieces: this.pieces,
       level,
-      bottom: this.session.upright ? uprightBottom(level) : undefined,
       toBoard: (ray) => this.toBoard(ray),
       onPick: (piece) => this.onPick(piece),
       onMove: (piece) => this.render(piece),
@@ -861,7 +861,7 @@ function disposeObject(root) {
 }
 
 // Prostokątny obrys planszy z czterech pasków. Ma te same trzy poziomy grup co plansza w sesji (sesja.js),
-// żeby poseBoard ustawiał go tak jak ją: leżący albo stojący.
+// żeby poseBoard ustawiał go tak jak ją: leżący albo zwrócony do gracza.
 function createOutline() {
   const group = new THREE.Group();
   const stand = new THREE.Group();
@@ -876,7 +876,7 @@ function createOutline() {
   bar(1, OUTLINE_WIDTH, 0.5, BOARD_H);
   bar(OUTLINE_WIDTH, BOARD_H, 0, BOARD_H / 2);
   bar(OUTLINE_WIDTH, BOARD_H, 1, BOARD_H / 2);
-  poseBoard(stand, plate, false);
+  poseBoard(stand, plate, 0, BOARD_H / 2);
   stand.add(plate);
   group.add(stand);
   group.userData = { stand, plate };

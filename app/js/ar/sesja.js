@@ -2,12 +2,12 @@
 // XrSession działa na telefonie z ARCore, CameraSession na pozostałych telefonach, a SimulatedSession na komputerze.
 // Reszta kodu nie wie, której używa.
 import * as THREE from "../../vendor/three.module.min.js";
-import { BOARD_H, boardPose, fixedView } from "./uklad.js";
+import { BOARD_H, UPRIGHT_PIVOT, boardPose, facingTilt, fixedView } from "./uklad.js";
 
 const SIM_TARGET_Y = 1; // wysokość, na którą patrzy kamera symulatora
 const FACE_MS = 400; // stała czasu obrotu stojącej planszy do gracza: po 0,4 s zostaje 37% kąta
 const FACE_MIN_METERS = 0.2;
-const DEFAULT_TAN_HALF_FOV = Math.tan((45 * Math.PI) / 360); // gdy przeglądarka nie poda macierzy rzutowania
+const DEFAULT_TAN_HALF_FOV = Math.tan((33 * Math.PI) / 360); // telefon w pionie, gdy przeglądarka nie poda rzutowania
 const XR_RESOLUTION = 0.7; // pełna rozdzielczość telefonu daje tylko 20–25 kl./s przy pustej scenie, a ta stałe 30
 const CAMERA_REQUEST = { audio: false, video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } };
 
@@ -37,7 +37,7 @@ class Session {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.01, 40);
     this.surface = null; // stałe miejsce planszy w trybie z kamerą
-    this.view = null; // skąd i dokąd patrzy telefon: { eye, forward, tanHalfFov }
+    this.view = null; // skąd i dokąd patrzy telefon: { eye, forward, tanHalfFov, tanHalfFovY }
     this.tracking = true;
     this.visibilityState = "visible";
     this.ended = false;
@@ -47,7 +47,8 @@ class Session {
     this.placement = new THREE.Group();
     this.stand = new THREE.Group();
     this.board = new THREE.Group();
-    poseBoard(this.stand, this.board, false);
+    this.tilt = 0;
+    poseBoard(this.stand, this.board, 0, BOARD_H / 2);
     this.stand.add(this.board);
     this.placement.add(this.stand);
     this.placement.visible = false;
@@ -90,10 +91,12 @@ class Session {
     return this.listen("visibility", callback);
   }
 
-  // Stawia planszę w `spot` ({ position, yaw }), domyślnie w stałym miejscu trybu z kamerą. Kolejne wywołanie
-  // przenosi tę samą grupę. Sesja z `upright` stawia ją pionowo; podklasa ustawia to pole, więc czyta się je tutaj.
+  // Stawia planszę w `spot` ({ position, yaw, tilt }), domyślnie w stałym miejscu trybu z kamerą. Kolejne wywołanie
+  // przenosi tę samą grupę. Sesja z `upright` zawiesza ją zwróconą do gracza (bez `tilt` pionowo) i obraca wokół
+  // środka całości z elementami, a bez niego kładzie płasko; podklasa ustawia to pole, więc czyta się je tutaj.
   placeBoard(widthMeters, spot = this.surface) {
-    poseBoard(this.stand, this.board, this.upright);
+    this.tilt = this.upright ? (spot.tilt ?? Math.PI / 2) : 0;
+    poseBoard(this.stand, this.board, this.tilt, this.upright ? UPRIGHT_PIVOT : BOARD_H / 2);
     this.placement.position.copy(spot.position);
     this.placement.rotation.y = spot.yaw;
     this.placement.scale.setScalar(widthMeters);
@@ -171,8 +174,8 @@ export class XrSession extends Session {
     this.renderer.render(this.scene, this.camera);
   }
 
-  // Z boku widać tylko krawędź stojącej planszy. Gracz chodzi, a ARCore przesuwa kotwicę, więc plansza płynnie
-  // obraca się wokół pionowej osi przodem do telefonu, krótszą drogą.
+  // Z boku albo z góry wisząca plansza jest widoczna pod ostrym kątem. Gracz chodzi, kuca i wstaje, a ARCore
+  // przesuwa kotwicę, więc plansza płynnie obraca się przodem do telefonu: w bok krótszą drogą i do tyłu jak pulpit.
   faceViewer(eye, time) {
     const elapsed = time - (this.facedAt ?? time);
     this.facedAt = time;
@@ -181,8 +184,11 @@ export class XrSession extends Session {
     const dx = eye.x - position.x;
     const dz = eye.z - position.z;
     if (Math.hypot(dx, dz) < FACE_MIN_METERS) return; // telefon tuż nad planszą: kierunek byłby przypadkowy
+    const k = 1 - Math.exp(-elapsed / FACE_MS);
     const turn = Math.atan2(dx, dz) - rotation.y;
-    rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * (1 - Math.exp(-elapsed / FACE_MS));
+    rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * k;
+    this.tilt += (facingTilt(eye, position) - this.tilt) * k;
+    poseBoard(this.stand, this.board, this.tilt, UPRIGHT_PIVOT);
   }
 
   // Kotwica powstaje w następnej klatce, bo tylko w niej da się ją utworzyć.
@@ -421,8 +427,8 @@ class SimulatedSession extends CanvasSession {
 
   frame(time) {
     const forward = this.camera.getWorldDirection(new THREE.Vector3());
-    const tanHalfFov = Math.tan((this.camera.fov * Math.PI) / 360) * this.camera.aspect;
-    this.view = { eye: this.camera.position.clone(), forward, tanHalfFov };
+    const tanHalfFovY = Math.tan((this.camera.fov * Math.PI) / 360);
+    this.view = { eye: this.camera.position.clone(), forward, tanHalfFov: tanHalfFovY * this.camera.aspect, tanHalfFovY };
     super.frame(time);
   }
 
@@ -448,10 +454,10 @@ class SimulatedSession extends CanvasSession {
 }
 
 // Ustawia planszę względem wybranego punktu według boardPose. Tak samo ustawia się obrys przy stawianiu.
-export function poseBoard(stand, board, upright) {
-  const { tilt, lift, offset } = boardPose(upright);
+export function poseBoard(stand, board, tilt, pivotZ) {
+  const { lift, back, offset } = boardPose(tilt, pivotZ);
   stand.rotation.x = tilt;
-  stand.position.y = lift;
+  stand.position.set(0, lift, back);
   board.position.set(offset.x, 0, offset.z);
 }
 
@@ -476,15 +482,17 @@ async function setSessionWithoutLayers(renderer, session) {
   }
 }
 
-// Skąd i dokąd patrzy telefon w tej klatce. Kąt widzenia w poziomie daje macierz rzutowania widoku.
+// Skąd i dokąd patrzy telefon w tej klatce. Kąty widzenia w poziomie i w pionie daje macierz rzutowania widoku.
 function viewOf(pose) {
   const { position, orientation } = pose.transform;
   const quaternion = new THREE.Quaternion(orientation.x, orientation.y, orientation.z, orientation.w);
-  const scaleX = pose.views?.[0]?.projectionMatrix?.[0];
+  const projection = pose.views?.[0]?.projectionMatrix;
+  const tangent = (scale, fallback) => (scale > 0 ? 1 / scale : fallback);
   return {
     eye: new THREE.Vector3(position.x, position.y, position.z),
     forward: new THREE.Vector3(0, 0, -1).applyQuaternion(quaternion),
-    tanHalfFov: scaleX > 0 ? 1 / scaleX : DEFAULT_TAN_HALF_FOV,
+    tanHalfFov: tangent(projection?.[0], DEFAULT_TAN_HALF_FOV),
+    tanHalfFovY: tangent(projection?.[5], DEFAULT_TAN_HALF_FOV * 2),
   };
 }
 

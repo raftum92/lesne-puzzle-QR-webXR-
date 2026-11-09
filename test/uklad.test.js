@@ -12,9 +12,9 @@ import {
   HOME_MARGIN,
   HOME_SPREAD,
   TILT,
+  UPRIGHT_PIVOT,
   aimSpot,
   boardPose,
-  uprightBottom,
   cellSize,
   targetOf,
   planHomes,
@@ -30,7 +30,7 @@ import {
 const H = 9 / 16;
 
 test("stałe mają wartości ze specyfikacji", () => {
-  assert.deepEqual(BOARD_METERS, { mala: 0.5, duza: 1.2 });
+  assert.deepEqual(BOARD_METERS, { mala: 0.5, duza: 0.8 });
   assert.equal(BOARD_H, H);
   assert.equal(FRAME_SCALE, 1.5);
   assert.equal(THICKNESS, 0.012);
@@ -189,41 +189,74 @@ test("clampToArea zatrzymuje punkt na granicy obszaru", () => {
   assert.deepEqual(clampToArea({ x: 0.5, z: 0.2 }), { x: 0.5, z: 0.2 });
 });
 
-test("przeciągany element na pionowej planszy nie zejdzie niżej niż rozsypane", () => {
-  for (const level of Object.values(LEVELS)) {
-    const bottom = uprightBottom(level);
-    assert.ok(Math.max(...planHomes(level).map((home) => home.z)) <= bottom + 1e-9, level.id);
-    assert.equal(clampToArea({ x: 0.5, z: 5 }, bottom).z, bottom);
+// Punkt planszy (0,5; 0; pivotZ) po ułożeniu według boardPose: obrót wokół osi x o tilt i przesunięcie grupy.
+function placedPivot(tilt, pivotZ) {
+  const { lift, back, offset } = boardPose(tilt, pivotZ);
+  const z = offset.z + pivotZ;
+  return { x: offset.x + 0.5, y: lift - z * Math.sin(tilt), z: back + z * Math.cos(tilt) };
+}
+
+test("boardPose: przy każdym nachyleniu punkt obrotu planszy zostaje w wybranym miejscu", () => {
+  for (const tilt of [0, 0.4, Math.PI / 4, Math.PI / 2, 2]) {
+    for (const pivotZ of [H / 2, UPRIGHT_PIVOT]) {
+      const p = placedPivot(tilt, pivotZ);
+      assert.ok(Math.abs(p.x) < 1e-9 && Math.abs(p.y) < 1e-9 && Math.abs(p.z) < 1e-9, `tilt=${tilt}, pivot=${pivotZ}`);
+    }
+  }
+  assert.equal(boardPose(0, H / 2).tilt, 0);
+  assert.ok(UPRIGHT_PIVOT > H, "na wiszącej planszy obraca się środek całości z elementami pod planszą");
+});
+
+// Telefon w pionie widzi w Chrome około 33° w poziomie i 67° w pionie (OnePlus Nord 4, 9.11.2026).
+const PHONE = { x: 0.296, y: 0.66 };
+
+// Obszar planszy z elementami w siatce pod nią, w jednostkach planszy, od środka planszy w poziomie.
+function frontArea(level) {
+  const { cw, ch } = cellSize(level);
+  const homes = planFrontHomes(level, () => 0.5);
+  return {
+    half: Math.max(0.5, ...homes.map((home) => Math.abs(home.x - 0.5) + cw / 2)),
+    bottom: Math.max(...homes.map((home) => home.z + ch / 2)),
+  };
+}
+
+test("aimSpot: plansza z elementami pod nią wisi tam, gdzie celuje telefon, przodem do niego, cała w kadrze", () => {
+  const eye = { x: 1, y: 1.5, z: 2 };
+  const pitch = 0.5; // telefon pochylony w dół
+  const forward = { x: 0, y: -Math.sin(pitch), z: -Math.cos(pitch) };
+  for (const meters of Object.values(BOARD_METERS)) {
+    const spot = aimSpot(eye, forward, meters, PHONE.x, PHONE.y);
+    const to = { x: spot.position.x - eye.x, y: spot.position.y - eye.y, z: spot.position.z - eye.z };
+    const distance = Math.hypot(to.x, to.y, to.z);
+    assert.ok(Math.abs(to.x) < 1e-9 && Math.abs(to.y / distance - forward.y) < 1e-9 && Math.abs(to.z / distance - forward.z) < 1e-9, "środek całości na linii celowania");
+    assert.ok(Math.abs(spot.yaw) < 1e-9, "przód planszy do telefonu");
+    assert.ok(Math.abs(spot.tilt - (Math.PI / 2 - pitch)) < 1e-9, "plansza poniżej telefonu odchyla się do niego, prostopadle do linii celowania");
+    for (const level of Object.values(LEVELS)) {
+      const { half, bottom } = frontArea(level);
+      assert.ok(half * meters <= distance * PHONE.x, `${meters} m, ${level.id}: mieści się w poziomie`);
+      assert.ok((bottom / 2) * meters <= distance * PHONE.y, `${meters} m, ${level.id}: mieści się w pionie`);
+      assert.ok(Math.abs(bottom / 2 - UPRIGHT_PIVOT) < 0.06, `${level.id}: środek całości blisko punktu obrotu`);
+    }
   }
 });
 
-test("boardPose: obie plansze mają środek w wybranym punkcie, stojąca obraca się do pionu", () => {
-  assert.deepEqual(boardPose(false), { tilt: 0, lift: 0, offset: { x: -0.5, z: -H / 2 } });
-  assert.deepEqual(boardPose(true), { tilt: Math.PI / 2, lift: H / 2, offset: { x: -0.5, z: 0 } });
-});
-
-test("aimSpot: plansza wisi przed telefonem, przodem do niego, trochę niżej", () => {
-  const eye = { x: 1, y: 1.5, z: 2 };
-  const spot = aimSpot(eye, { x: 0, y: -0.3, z: -1 }, 1.2, 0.5);
-  const distance = Math.hypot(spot.position.x - eye.x, spot.position.z - eye.z);
-  assert.ok(Math.abs(spot.position.x - eye.x) < 1e-9 && spot.position.z < eye.z, "na wprost, mimo telefonu pochylonego w dół");
-  assert.ok(spot.position.y < eye.y && spot.position.y > eye.y - 0.5, "środek trochę niżej niż telefon");
-  assert.ok(Math.abs(spot.yaw) < 1e-9, "przód planszy do telefonu");
-  const halfArea = (1 + 2 * (HOME_MARGIN + HOME_SPREAD)) / 2;
-  assert.ok(halfArea * 1.2 <= distance * 0.5, "cała plansza z elementami mieści się w kadrze");
-});
-
-test("aimSpot: mała plansza wisi bliżej niż duża, a węższy kadr odsuwa planszę", () => {
+test("aimSpot: na zwykłym telefonie mała plansza wisi około 1 m od gracza, a duża około 1,5 m", () => {
   const eye = { x: 0, y: 1.5, z: 0 };
-  const forward = { x: 0, y: 0, z: -1 };
-  const far = (meters, tan) => -aimSpot(eye, forward, meters, tan).position.z;
-  assert.ok(far(BOARD_METERS.mala, 0.5) < far(BOARD_METERS.duza, 0.5));
-  assert.ok(far(BOARD_METERS.mala, 0.4) > far(BOARD_METERS.mala, 0.5));
+  const far = (meters) => -aimSpot(eye, { x: 0, y: 0, z: -1 }, meters, PHONE.x, PHONE.y).position.z;
+  assert.ok(Math.abs(aimSpot(eye, { x: 0, y: 0, z: -1 }, 0.5, PHONE.x, PHONE.y).tilt - Math.PI / 2) < 1e-9, "telefon trzymany poziomo: plansza pionowo");
+  assert.ok(far(BOARD_METERS.mala) > 0.85 && far(BOARD_METERS.mala) < 1.15, `mała: ${far(BOARD_METERS.mala)}`);
+  assert.ok(far(BOARD_METERS.duza) > 1.35 && far(BOARD_METERS.duza) < 1.75, `duża: ${far(BOARD_METERS.duza)}`);
+});
+
+test("aimSpot: węższy kadr odsuwa planszę", () => {
+  const eye = { x: 0, y: 1.5, z: 0 };
+  const far = (tan) => -aimSpot(eye, { x: 0, y: 0, z: -1 }, BOARD_METERS.mala, tan, PHONE.y).position.z;
+  assert.ok(far(0.25) > far(0.3));
 });
 
 test("aimSpot: telefon skierowany prosto w dół albo w górę nie wybiera miejsca", () => {
-  assert.equal(aimSpot({ x: 0, y: 1.5, z: 0 }, { x: 0, y: -1, z: 0.01 }, 1.2, 0.5), null);
-  assert.equal(aimSpot({ x: 0, y: 1.5, z: 0 }, { x: 0.01, y: 1, z: 0 }, 1.2, 0.5), null);
+  assert.equal(aimSpot({ x: 0, y: 1.5, z: 0 }, { x: 0, y: -1, z: 0.01 }, 0.5, PHONE.x, PHONE.y), null);
+  assert.equal(aimSpot({ x: 0, y: 1.5, z: 0 }, { x: 0.01, y: 1, z: 0 }, 0.5, PHONE.x, PHONE.y), null);
 });
 
 test("intersectBoard: promień w dół trafia, a prawie poziomy nie", () => {

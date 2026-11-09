@@ -3,9 +3,8 @@
 import { pickPiece, clampToArea, shouldSnap, isNear, intersectBoard, targetOf } from "./uklad.js";
 
 export class Dragger {
-  // `bottom` to największe z dla przeciąganego elementu (clampToArea); bez niego obowiązuje zwykły obszar.
-  constructor({ pieces, level, bottom, toBoard, onPick, onMove, onNear, onSnap, onDrop }) {
-    Object.assign(this, { pieces, level, bottom, toBoard, onPick, onMove, onNear, onSnap, onDrop });
+  constructor({ pieces, level, toBoard, onPick, onMove, onNear, onSnap, onDrop }) {
+    Object.assign(this, { pieces, level, toBoard, onPick, onMove, onNear, onSnap, onDrop });
     this.enabled = true;
     this.drag = null;
     this.near = null;
@@ -38,7 +37,7 @@ export class Dragger {
     const point = this.point(ray);
     if (!point) return; // promień prawie równoległy do planszy: element czeka na miejscu
     const { piece, dx, dz } = this.drag;
-    Object.assign(piece, clampToArea({ x: point.x + dx, z: point.z + dz }, this.bottom));
+    Object.assign(piece, clampToArea({ x: point.x + dx, z: point.z + dz }));
     this.onMove(piece);
     this.setNear(this.level.hints && isNear(piece, piece, this.level) ? piece : null);
   }

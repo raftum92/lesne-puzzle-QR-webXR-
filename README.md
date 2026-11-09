@@ -35,7 +35,9 @@ Sprawdzone na prawdziwych telefonach 7 listopada 2026: telefon z ARCore gra w tr
 
 Kody QR prowadzą na https://pomoceedukacyjne.pl/puzzle/app/ (`PUBLIC_URL` w `app/js/telefon.js`). Gra leży tam w folderze `httpdocs/puzzle/` na serwerze Plesk w artnet (`v46197.artnet.gda.pl`, 178.255.46.197), obok strony głównej domeny. DNS i https daje Cloudflare: domena główna i `www` idą przez jego proxy, a poczta i FTP prosto na serwer.
 
-Nową wersję wgrywa się przez FTPS (FTP z TLS, port 21): pliki `index.html`, `app/` i `assets/` z repozytorium do `httpdocs/puzzle/`. Serwer ProFTPD zrywa część przesyłań przy TLS 1.3 (kod 426), więc `curl` dostaje `--tls-max 1.2`. Po wgraniu trzeba wyczyścić pamięć podręczną w Cloudflare (Caching → Purge Everything), bo inaczej telefony mogą dostać stare pliki.
+Nową wersję wgrywa się przez FTPS (FTP z TLS, port 21) do `httpdocs/puzzle/`. Serwer ProFTPD zrywa część przesyłań przy TLS 1.3 (kod 426), więc `curl` dostaje `--tls-max 1.2`.
+
+Cloudflare i przeglądarki trzymają skrypty i style do 4 godzin, a moduły trybu „W przestrzeni” wczytywane po starcie strony nie odświeżają się nawet po wyczyszczeniu pamięci. Dlatego kod wgrywa się w wersji przygotowanej przez `node narzedzia/wersjonuj.mjs <katalog>`: kopia `index.html`, `app/js`, `app/css`, `app/vendor` i manifestu, w której każdy import i każdy odnośnik do stylu lub skryptu ma dopisane `?v=<skrót treści kodu>`. Każda zmiana kodu daje nowe adresy, więc telefon od razu pobiera nowy kod. HTML gry Cloudflare podaje zawsze świeży. Kod wgrywa się zawsze w całości, z jedną wersją, a HTML na końcu. Pliki w repozytorium zostają bez wersji. Filmy, obrazki i czcionki nie mają wersji: po ich podmianie trzeba wyczyścić pamięć w Cloudflare (Caching → Purge Everything).
 
 ## Serwer: GitHub Pages
 
@@ -82,6 +84,7 @@ Potem w Chrome na telefonie: `http://localhost:8000/app/?debug=1`. Parametr `deb
 | `assets/filmy-720p/` | Lżejsze filmy 1280×720 do trybu „W przestrzeni” |
 | `assets/filmy-skok/` | Filmy, w których zwierzę wyskakuje z ramy w trybie „W przestrzeni” |
 | `narzedzia/serwer.py` | Serwer do podglądu z obsługą nagłówka Range |
+| `narzedzia/wersjonuj.mjs` | Kopia kodu do wgrania na serwer, z wersją w adresach skryptów i stylów |
 | `test/` | Testy logiki gry, kodów QR i trybu „W przestrzeni” |
 
 Dokumentacja, narzędzia do filmów i materiały źródłowe, na które wskazują niektóre komentarze w kodzie, są w prywatnym repozytorium `lesne-puzzle-WebXR`. To repozytorium jest publiczne, więc zawiera tylko to, co jest potrzebne do działania gry i jej testów.

@@ -2,7 +2,7 @@
 
 Gra o zwierzętach polskich lasów: ułóż obrazek, a zwierzę ożyje. Czysty HTML, CSS i JavaScript, bez instalowania zależności i bez kroku budowania.
 
-Gra działa pod adresem: https://raftum92.github.io/lesne-puzzle-QR-webXR-/app/
+Gra działa pod adresem: https://pomoceedukacyjne.pl/puzzle/app/. Wersja z gałęzi `main` jest też na GitHub Pages: https://raftum92.github.io/lesne-puzzle-QR-webXR-/app/
 
 ## Kody QR: z monitora na telefon
 
@@ -30,6 +30,12 @@ Gdy nie ruszy też kamera, okno z błędem kończy się kodem, np. „Kod błęd
 Monitor z kamerką, także dotykowy, nie dostaje tego trybu, tylko okno z kodem QR. Telefon bez kamery, bez zgody na nią albo bez HTTPS gra na ekranie.
 
 Sprawdzone na prawdziwych telefonach 7 listopada 2026: telefon z ARCore gra w trybie „W przestrzeni”, a Moto G13 (bez ARCore) w trybie „Z kamerą”, po zeskanowaniu kodu QR z monitora. Na iPhonie tryb „Z kamerą” nie był jeszcze sprawdzany.
+
+## Serwer: pomoceedukacyjne.pl
+
+Kody QR prowadzą na https://pomoceedukacyjne.pl/puzzle/app/ (`PUBLIC_URL` w `app/js/telefon.js`). Gra leży tam w folderze `httpdocs/puzzle/` na serwerze Plesk w artnet (`v46197.artnet.gda.pl`, 178.255.46.197), obok strony głównej domeny. DNS i https daje Cloudflare: domena główna i `www` idą przez jego proxy, a poczta i FTP prosto na serwer.
+
+Nową wersję wgrywa się przez FTPS (FTP z TLS, port 21): pliki `index.html`, `app/` i `assets/` z repozytorium do `httpdocs/puzzle/`. Serwer ProFTPD zrywa część przesyłań przy TLS 1.3 (kod 426), więc `curl` dostaje `--tls-max 1.2`. Po wgraniu trzeba wyczyścić pamięć podręczną w Cloudflare (Caching → Purge Everything), bo inaczej telefony mogą dostać stare pliki.
 
 ## Serwer: GitHub Pages
 
